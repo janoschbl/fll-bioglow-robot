@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+benchmarking/
+benchmark_log.txt
