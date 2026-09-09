@@ -12,7 +12,7 @@ RIGHT_DRIVE_DIRECTION = Direction.CLOCKWISE
 WHEEL_DIAMETER_MM = 56
 AXLE_TRACK_MM = 112
 
-# @TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
+# TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
 DEFAULT_STRAIGHT_SPEED = 450
 DEFAULT_STRAIGHT_ACCELERATION = 700
 DEFAULT_TURN_RATE = 150
@@ -36,3 +36,8 @@ STALL_TIMEOUT_MS = 6000
 STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3
 STALL_MIN_PROGRESS_RATIO = 0.10
+
+# Run-Telemetrie: 50 Hz, vollständig im RAM gepuffert und erst nach dem Run
+# übertragen. Reicht der Puffer nicht, wird der Verlust im Abschluss gemeldet.
+TELEMETRY_SAMPLE_MS = 20
+TELEMETRY_MAX_BYTES = 180000

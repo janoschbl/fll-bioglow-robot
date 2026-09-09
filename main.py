@@ -7,6 +7,7 @@ import programs
 import robot_config as config
 from menu import Menu
 from robot import Robot
+from telemetry import Telemetry
 
 
 def create_force_sensor():
@@ -50,7 +51,15 @@ def main():
     )
     robot.reset_drivebase_settings()
 
-    menu = Menu(hub, robot, create_force_sensor())
+    force_sensor = create_force_sensor()
+    telemetry = Telemetry(
+        hub,
+        drive_base,
+        (left_motor, right_motor, left_drive_motor, right_drive_motor),
+        force_sensor,
+    )
+    robot.set_telemetry(telemetry)
+    menu = Menu(hub, robot, force_sensor)
     programs.load(menu.program, robot)
 
     menu.register_motor_debug(left_motor, direction=1, index=1, name="Left Motor")
@@ -63,4 +72,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
