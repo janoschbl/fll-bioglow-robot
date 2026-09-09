@@ -229,22 +229,29 @@ class Menu:
         self.robot.reset_drivebase_settings()
 
         self.running_program = entry
-        self.robot.begin_program()
+        self.robot.begin_program(entry["name"])
         self.hub.display.off()
+        outcome = "success"
 
         try:
             entry["func"]()
         except ProgramAborted:
+            outcome = "aborted"
             print("PROGRAM_ABORTED", entry["name"])
         except MotionTimeout as error:
+            outcome = "timeout"
             print("PROGRAM_TIMEOUT", entry["name"], str(error))
         except Exception as error:
+            outcome = "error"
             # menü bleibt nach program error aktiv
             print("PROGRAM_ERROR", entry["name"], str(error))
         finally:
             self.robot.emergency_stop()
             self.robot.reset_drivebase_settings()
-            self.robot.end_program()
+            try:
+                self.robot.end_program(outcome)
+            except Exception as error:
+                print("TELEMETRY_SEND_ERROR", str(error))
             self.running_program = None
             self.previous_buttons = set(self.hub.buttons.pressed())
             self.hub.display.off()

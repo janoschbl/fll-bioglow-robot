@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Bioglow · Vom echten Run zur 3D-Wiedergabe</title>
+<style>
+:root{--ink:#172c3b;--muted:#465e6b;--paper:#f7fafb;--white:#fff;--line:#ccd9df;--blue:#145778;--green:#166345;--wash:#e5f2ec;--amber:#734800;--sand:#fff0d8;--pad:clamp(20px,4vw,64px)}
+*{box-sizing:border-box}html{scroll-padding-top:28px}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:var(--blue);text-underline-offset:4px}a:hover{text-decoration-thickness:2px}::selection{background:#b8ddcc;color:var(--ink)}:focus-visible{outline:3px solid var(--blue);outline-offset:5px}header{border-bottom:1px solid var(--line);padding:18px var(--pad);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--white)}header strong{font-weight:750}header span{color:var(--muted);font-size:14px}.layout{display:grid;grid-template-columns:230px minmax(0,1fr);max-width:1540px;margin:auto}nav{padding:32px 24px;align-self:start;position:sticky;top:0}nav a{display:block;padding:8px 0;text-decoration:none;font-size:15px}nav small{display:block;color:var(--muted);margin:24px 0 10px}main{min-width:0;padding:48px var(--pad) 80px;border-left:1px solid var(--line)}h1{font-size:clamp(35px,4.8vw,64px);line-height:1.09;letter-spacing:-.035em;max-width:16ch;margin:0 0 28px;text-wrap:balance}h2{font-size:clamp(27px,3vw,38px);line-height:1.2;letter-spacing:-.02em;margin:0 0 24px;text-wrap:balance}h3{font-size:21px;line-height:1.35;margin:32px 0 12px}p{max-width:74ch;margin:0 0 18px}.lead{font-size:22px;max-width:60ch;line-height:1.5}.section{padding:52px 0;border-bottom:1px solid var(--line)}.section:first-child{padding-top:0}.note{padding:22px 26px;background:var(--wash);margin:26px 0}.warning{background:var(--sand)}.note p:last-child{margin-bottom:0}.meta{font-size:14px;color:var(--muted)}.links{display:flex;flex-wrap:wrap;gap:12px 24px;margin:26px 0}.split{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin:24px 0}.split>div{min-width:0}.mini{font-size:15px}code,pre,.value{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}code{font-size:.87em;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eaf0f4;padding:22px;font-size:13px;line-height:1.65}pre code{font-size:inherit}table{width:100%;border-collapse:collapse;font-size:15px;margin:20px 0}th{text-align:left;font-weight:650;background:#eaf0f4}td,th{vertical-align:top;padding:13px 12px;border-bottom:1px solid var(--line)}td:first-child{min-width:125px}caption{text-align:left;font-size:14px;color:var(--muted);margin-bottom:12px}ul,ol{padding-left:23px;max-width:78ch}li{margin:10px 0}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:30px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.flow>div{padding:22px 16px;border-right:1px solid var(--line)}.flow>div:last-child{border:0}.flow strong{display:block;font-size:18px}.flow span{display:block;font-size:14px;color:var(--muted);margin-top:8px}.flow b{display:block;color:var(--green);margin-top:12px}.graphic{background:var(--white);padding:24px;margin:28px 0}.graphic svg{display:block;width:100%;height:auto}.legend{display:flex;flex-wrap:wrap;gap:20px;font-size:14px;margin:12px 0}.legend span::before{content:"";display:inline-block;width:22px;height:3px;background:var(--blue);vertical-align:middle;margin-right:8px}.legend .real::before{background:var(--green)}.legend .estimate::before{height:0;background:none;border-top:3px dashed var(--amber)}.controls{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:25px 0}.controls label{display:block;font-size:15px}input[type=range]{width:100%;accent-color:var(--blue);margin-top:12px}select,button{font:inherit;color:var(--ink);background:var(--white);border:1px solid var(--line);border-radius:5px;padding:9px 12px;max-width:100%}button{cursor:pointer}button:hover{background:var(--wash)}output{font-variant-numeric:tabular-nums}.results{display:flex;flex-wrap:wrap;gap:20px 42px;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.results span{font-size:14px;color:var(--muted)}.results strong{display:block;color:var(--ink);font-size:25px;font-weight:600}details{margin:18px 0;border-bottom:1px solid var(--line);padding-bottom:16px}summary{cursor:pointer;font-weight:600;padding:10px 0}details p{margin-top:12px}.tag{font-size:13px;font-weight:650;color:var(--green)}.table-scroll{overflow-x:auto}.phase{display:grid;grid-template-columns:48px 1fr;gap:18px;margin:30px 0}.phase>span{font-size:25px;color:var(--blue);font-weight:650}.phase h3{margin:0 0 12px}.phase p{margin-bottom:12px}.sources li{font-size:15px}.foot{padding-top:30px;color:var(--muted);font-size:14px}.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.diagram-scroll{overflow-x:auto}.diagram-scroll svg{min-width:700px}.diagram-hint{display:none}
+@media(max-width:1050px){.layout{grid-template-columns:190px minmax(0,1fr)}nav{padding:24px 18px}.flow{grid-template-columns:1fr 1fr}.flow>div:nth-child(2){border-right:0}.flow>div:nth-child(-n+2){border-bottom:1px solid var(--line)}main{padding-top:36px}.diagram-hint{display:block}}
+@media(max-width:760px){.layout{display:block}nav{position:static;display:flex;flex-wrap:wrap;gap:0 20px;padding:16px 20px;border-bottom:1px solid var(--line)}nav small{display:none}nav a{font-size:14px}main{border:0;padding:32px 20px 50px}.split,.controls{grid-template-columns:1fr;gap:14px}.section{padding:36px 0}.lead{font-size:20px}.graphic{padding:12px}td,th{padding:11px 8px;font-size:14px}.note{padding:18px}.flow>div{padding:18px 12px}.flow strong{font-size:16px}header span{font-size:13px}.phase{grid-template-columns:30px 1fr;gap:12px}}
+@media print{nav,.controls,button{display:none}body{background:white;font-size:11pt}.layout{display:block}main{border:0;padding:20px}h1{font-size:32pt}.section{padding:24px 0}.graphic,.note,table{break-inside:avoid}a{color:inherit}header{padding:12px 20px}.flow{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<!-- Scope: a technical planning document, not a web IDE implementation. Read mode.
+     Source-of-truth: five existing Python files and linked primary documentation.
+     The three articles separate explanation, reference, and proposed procedure.
+     All diagrams and calculations are illustrative. No recorded robot data exists here. -->
+<header><strong>BIOGLOW / Engineering</strong><span>Planungsstand · 8. September 2026 · Keine Änderungen an der Robotersteuerung</span></header>
+<div class="layout">
+<nav aria-label="Inhaltsverzeichnis">
+<a href="#entscheidung">Die Entscheidung</a><a href="#bewegung">Bewegung &amp; Position</a><a href="#datenfluss">Vom Hub in den Browser</a><a href="#datenrate">Messrate &amp; Datenmenge</a><a href="#integration">Eure Codebase</a>
+<small>Referenz</small><a href="#messdaten">Messdatenkatalog</a><a href="#format">Datenvertrag</a>
+<small>Vorgehen</small><a href="#umsetzung">Umsetzungsplan</a><a href="#abnahme">Tests &amp; offene Fragen</a><a href="#quellen">Quellen</a><a href="#redaktion">Textprüfung</a>
+</nav>
+<main>
+<article aria-label="Erklärung des Telemetriekonzepts">
+<section class="section" id="entscheidung">
+<h1>Vom echten Run zur 3D-Wiedergabe.</h1>
+<p class="lead">Zeichne die Sensorwerte und Motorwinkel auf. Berechne die Position im Browser. Spiele den Run als zeitgestützte Bewegung ab.</p>
+<p>Ja, strukturierter Konsolenoutput ist ein brauchbarer Start. Deine Web-IDE kann die Daten direkt beim Empfang abzweigen, speichern und an die 3D-Ansicht weitergeben. Die sichtbare Konsole bleibt für Meldungen wie <code>PROGRAM_TIMEOUT</code> frei.</p>
+<div class="note warning"><p><strong>Die Grenze: Sechs IMU-Achsen sind keine sechs gemessenen Freiheitsgrade.</strong> Drei Beschleunigungen und drei Drehraten beschreiben Bewegungssignale. Eine vollständige räumliche Pose umfasst dagegen <code>x, y, z</code> und eine Orientierung. Die XYZ-Position muss geschätzt oder zusätzlich beobachtet werden.</p></div>
+<p>Mein Vorschlag beginnt mit einem <strong>Replay</strong>: Das 3D-Modell übernimmt die geschätzte Pose und die gemessenen Gelenkwinkel. Später bekommt die App einen getrennten <strong>Simulationsmodus</strong>, der Programme ohne echten Roboter ausführt und die Physik berechnet.</p>
+<div class="split"><div><h3>Replay: Was ist passiert?</h3><p>Messdaten bestimmen den Ablauf. Das Robotermodell folgt der aufgezeichneten Bewegung. Die Physik darf den Roboter dabei nicht zusätzlich verschieben.</p></div><div><h3>Simulation: Was würde passieren?</h3><p>Befehle, Motorregelung, Masse, Reibung und Kontakte bestimmen die Bewegung. Echte Runs dienen zum Kalibrieren und zum Vergleich.</p></div></div>
+<p class="meta">Ergebnis dieses Auftrags: ein Plan. Kein Logger wurde eingebaut, keine Hardware getestet und keine Messgenauigkeit nachgewiesen. Angaben zu Raten und Grenzwerten sind Vorschläge.</p>
+<div class="links"><a href="#messdaten">Alle vorgesehenen Messfelder</a><a href="#umsetzung">Reihenfolge der Umsetzung</a></div>
+</section>
+<section class="section" id="bewegung">
+<h2>Die Orientierung ist zugänglich. Die Position bleibt eine Schätzung.</h2>
+<p>Für Kippen und kombinierte Drehungen ist <code>hub.imu.orientation()</code> der passende Ausgangspunkt: eine 3×3-Rotationsmatrix. Drei einzeln integrierte Achsenwinkel ersetzen diese räumliche Orientierung nicht. <a href="https://docs.pybricks.com/en/latest/hubs/primehub.html#pybricks.hubs.PrimeHub.imu.orientation">Pybricks: Orientierung</a>.</p>
+<div class="graphic">
+<p class="meta diagram-hint">Das Diagramm lässt sich horizontal verschieben.</p>
+<div class="diagram-scroll" tabindex="0" role="region" aria-label="Diagramm der Pose, horizontal verschiebbar">
+<svg viewBox="0 0 780 250" role="img" aria-labelledby="pose-title pose-desc">
+<title id="pose-title">Zwei getrennte Teile der räumlichen Pose</title><desc id="pose-desc">Beschleunigung und Drehrate führen zu einer geschätzten Orientierung. Motorwinkel und Orientierung führen unter Bodenkontaktannahmen zu einer geschätzten XY-Position. Eine externe Referenz korrigiert die Position.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#465e6b"/></marker></defs>
+<g fill="#eaf0f4"><rect x="8" y="20" width="215" height="80" rx="4"/><rect x="8" y="146" width="215" height="80" rx="4"/></g>
+<g fill="#e5f2ec"><rect x="292" y="20" width="220" height="80" rx="4"/><rect x="580" y="146" width="190" height="80" rx="4"/></g>
+<rect x="292" y="146" width="220" height="80" rx="4" fill="#fff0d8"/>
+<g fill="none" stroke="#465e6b" stroke-width="1.5" marker-end="url(#arrow)"><path d="M224 60H283"/><path d="M224 186H283"/><path d="M402 102V138"/><path d="M578 186H522"/></g>
+<g fill="#172c3b" font-family="system-ui,sans-serif" font-size="19"><text x="25" y="52">IMU · 6 Kanäle</text><text x="25" y="81" font-size="16">aₓ aᵧ a𝓏 · ωₓ ωᵧ ω𝓏</text><text x="25" y="178">Radencoder</text><text x="25" y="207" font-size="16">linkes + rechtes Rad</text><text x="311" y="52">Orientierung R</text><text x="311" y="81" font-size="16">Sensorfusion im Hub</text><text x="311" y="178">Position x, y</text><text x="311" y="207" font-size="16">Odometrielösung im PC</text><text x="598" y="178">Externe Referenz</text><text x="598" y="207" font-size="16">z. B. Kamerapose</text><text x="580" y="60" font-size="17">z: zunächst unbekannt</text><text x="580" y="87" font-size="15">oder Bodenannahme</text></g>
+</svg>
+</div>
+<p class="meta">Logische Abhängigkeiten, kein Versprechen über Genauigkeit. Die zusätzliche Referenz ist in eurer Codebase noch nicht vorhanden.</p>
+</div>
+<h3>Auf der Ebene: Radweg plus Richtung</h3>
+<p>Als Startmodell dient Differentialantriebs-Odometrie. Sie integriert die Radbewegung mit dem Gyrowinkel. Kontakte und Schlupf führen zu Positionsfehlern. Das ist auch die ausdrücklich dokumentierte Grenze dieses Verfahrens in <a href="https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/differential-drive-odometry.html">WPILib: Differential Drive Odometry</a>.</p>
+<pre><code>ΔsL = π · dL · ΔφL / 360
+ΔsR = π · dR · ΔφR / 360
+Δs  = (ΔsL + ΔsR) / 2
+θ   = θStart − (heading − headingStart) · π / 180
+Δx ≈ Δs · cos(θVorher + Δθ / 2)
+Δy ≈ Δs · sin(θVorher + Δθ / 2)
+
+Unabhängiger Vergleich nur aus Encodern:
+ΔθEncoder = (ΔsR − ΔsL) / Spurweite</code></pre>
+<p class="mini">Definition für diesen Plan: rechtshändiges Feldsystem, Z nach oben, positiver Winkel gegen den Uhrzeigersinn. <code>φL</code> und <code>φR</code> sind auf Vorwärtsfahrt normierte Radwinkel. <code>dL</code> und <code>dR</code> sind kalibrierte wirksame Raddurchmesser. Die Näherung gilt für kleine Schritte auf der Ebene ohne Schlupf. Eine spätere Implementierung kann die Kreisbogengeometrie exakt integrieren.</p>
+<p>Die vorzeichenbehaftete Strecke und die gesamte Weglänge sind getrennte Werte. Vorwärts und rückwärts können sich in <code>s</code> aufheben. Die Weglänge addiert dagegen <code>|Δs|</code>.</p>
+<h3>Beim Rutschen fehlt eine Beobachtung</h3>
+<p>Wenn das Rad durchdreht, misst der Encoder trotzdem Drehung. Wenn der Roboter seitlich geschoben wird, kann Radodometrie diese Verschiebung übersehen. Ein Unterschied zwischen Encoder-Drehung und Gyro-Drehung ist ein Warnsignal, aber kein vollständiger Schlupfnachweis.</p>
+<div class="graphic">
+<p class="meta diagram-hint">Das Diagramm lässt sich horizontal verschieben.</p>
+<div class="diagram-scroll" tabindex="0" role="region" aria-label="Diagramm des Positionsfehlers, horizontal verschiebbar">
+<svg viewBox="0 0 780 235" role="img" aria-labelledby="slip-title slip-desc">
+<title id="slip-title">Seitliches Rutschen bleibt ohne Referenz unsichtbar</title><desc id="slip-desc">Eine gestrichelte Schätzung verläuft geradeaus. Der illustrative tatsächliche Weg weicht seitlich ab. Eine Referenz am Endpunkt macht den Fehler sichtbar.</desc>
+<path d="M65 185H733M65 185V20" fill="none" stroke="#ccd9df" stroke-width="1.5"/>
+<path d="M95 159L684 159" fill="none" stroke="#734800" stroke-width="3" stroke-dasharray="9 7"/>
+<path d="M95 159L306 159C383 159 393 73 471 73L684 73" fill="none" stroke="#166345" stroke-width="4"/>
+<path d="M684 85V148" fill="none" stroke="#145778" stroke-width="1.5"/>
+<g fill="#172c3b" font-size="17" font-family="system-ui,sans-serif"><text x="82" y="215">Start</text><text x="316" y="137">Schätzung</text><text x="463" y="52">tatsächlicher Weg*</text><text x="557" y="117">Positionsfehler</text><text x="691" y="215">X</text><text x="36" y="35">Y</text></g>
+<circle cx="684" cy="73" r="7" fill="#145778"/><circle cx="95" cy="159" r="5" fill="#172c3b"/>
+</svg>
+</div>
+<p class="meta">*Schematisches Beispiel, keine Bioglow-Messung. Der grüne Weg wäre erst durch eine zusätzliche Messung bekannt.</p>
+</div>
+<p>Für Trainingsmessungen empfehle ich eine kalibrierte Kamera über dem Feld mit einem fest am Roboter montierten Marker. Bekannte Feldpunkte, Kamera-Intrinsik und Markerposition verbinden das Bild mit dem Feldsystem. Verdeckungen und Zeitversatz bleiben Fehlerquellen. Für zuverlässige Höhe beim Kippen können weitere Sichtwinkel oder eine überprüfte 3D-Poseschätzung nötig sein. Das ist eine Architekturentscheidung, noch keine getestete Hardwareempfehlung.</p>
+<p>Referenzmessungen bekommen eigene Zeitstempel und Unsicherheiten. Die Positionsschätzung kann sie später zeitversetzt einarbeiten. Dieses Prinzip beschreibt <a href="https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html">WPILib: Pose Estimators</a>. Eine erkannte Bodenlinie oder ein bekannter Wandkontakt kann ebenfalls einzelne Freiheitsgrade korrigieren, bestimmt aber nicht automatisch die ganze Pose.</p>
+<h3>Beim Hochdrehen: Kippen zeigen, Höhe kennzeichnen</h3>
+<p>Im ersten Replay übernimmt das Modell die IMU-Orientierung. Die Position der Achsmitte bleibt auf einer angenommenen Ebene. Bei vermutetem Abheben wird die Radodometrie als unzuverlässig markiert. Ein Beschleunigungs- oder Neigungswert allein beweist keinen Bodenkontakt.</p>
+<p>Eine bekannte Rampe und ein bestätigter Kontakt könnten später eine geometrische Höhenschätzung liefern. Ohne solche Informationen heißt das Feld <code>z_estimated</code> oder bleibt <code>null</code>. Unbekannte Höhe wird niemals als gemessene Null gespeichert.</p>
+<h3>Warum Beschleunigung nicht einfach zweimal integrieren?</h3>
+<p>Zur Integration müsste der Browser die Beschleunigung korrekt ins Feldsystem drehen, den Ruheanteil durch die Schwerkraft berücksichtigen und Anfangsgeschwindigkeit sowie Sensorfehler kennen. Auch die Lage des Sensors relativ zur Achsmitte zählt: Drehen erzeugt am versetzten Sensor zusätzliche Beschleunigung.</p>
+<p>Schon ein konstanter Restfehler von <code>0,01 m/s²</code> ergibt nach zehn Sekunden <code>½ · 0,01 · 10² = 0,5 m</code> Positionsfehler. Das ist eine Beispielrechnung, kein gemessener IMU-Fehler. Die Beschleunigung ist für Stoßerkennung und eine spätere Sensorfusion wertvoll. Als alleinige Positionsquelle ist sie für euer Genauigkeitsziel ungeeignet.</p>
+<h3>Ein Achsenvertrag verhindert gespiegelte Runs</h3>
+<p>Der Plan verwendet am Roboter X nach vorn, Y nach links und Z nach oben. Der Feldursprung und die Startrichtung werden pro Run gespeichert. Die Hubmontage wird mit <code>top_side</code> und <code>front_side</code> beschrieben. Pybricks zählt den Heading im Uhrzeigersinn positiv. <a href="https://docs.pybricks.com/en/latest/parameters/axis.html">Pybricks: Axis</a> und <a href="https://docs.pybricks.com/en/latest/hubs/primehub.html">PrimeHub</a>.</p>
+<p>Die 3D-Engine bekommt eine ausdrücklich definierte Basisumrechnung, einschließlich Millimeter zu Meter, Modellursprung und Gelenkachsen. Für ein Y-up-Modell wäre beispielsweise <code>(X, Z, −Y)</code> eine mögliche Achsenabbildung. Die tatsächliche Zuordnung hängt von eurem importierten Modell ab.</p>
+<p>Die Matrix wird im Browser in ein normiertes Quaternion umgewandelt. Seine Komponentenreihenfolge wird im Schema festgelegt. Ein Test mit genau 90° um jede Achse prüft Matrixlayout, Transponierung und Vorzeichen. Die Anfangsmatrix richtet das Replay am Feld aus. <code>heading()</code> und <code>orientation()</code> bekommen nach Resets keine ungeprüft identische Nullreferenz.</p>
+</section>
+<section class="section" id="datenfluss">
+<h2>Ein Datenstrom, zwei Verbraucher.</h2>
+<p>Die Web-IDE fängt die Transportdaten ab, bevor ein Terminal sie darstellt. Der Recorder speichert jeden empfangenen Datensatz. Die Anzeige wählt die Daten passend zur Wiedergabezeit aus.</p>
+<div class="flow" role="list" aria-label="Telemetrie-Datenfluss">
+<div role="listitem"><strong>Hub</strong><span>Sensoren lesen, Hubzeit setzen, Befehle zuordnen.</span><b>Messdatensatz →</b></div>
+<div role="listitem"><strong>Verbindung</strong><span>USB am Prüfstand. Bluetooth beim freien Fahren.</span><b>Bytes →</b></div>
+<div role="listitem"><strong>Web-IDE</strong><span>Rahmen zusammensetzen, prüfen, dauerhaft ablegen.</span><b>Originaldaten →</b></div>
+<div role="listitem"><strong>Auswertung</strong><span>Pose berechnen, Run abspielen, Abweichungen zeigen.</span><b>3D + Analyse</b></div>
+</div>
+<h3>Stufe 1: Präfix und JSON pro Zeile</h3>
+<p>Ein festes Präfix wie <code>@BG1 </code> trennt Telemetrie von Textausgaben. Dahinter steht genau ein JSON-Objekt, abgeschlossen durch ein Zeilenende. Das ist gut prüfbar und exportierbar. <code>print()</code> muss aber hinsichtlich Laufzeit und Verhalten bei vollem Sendepuffer getestet werden.</p>
+<p>Ein Bluetooth-Ereignis ist keine vollständige Zeile. Der Empfänger rekonstruiert den Bytestrom und verarbeitet geteilte sowie zusammengefasste Zeilen. Die Protokollimplementierung kennt ein eigenes <code>WriteStdout</code>-Ereignis. <a href="https://github.com/pybricks/pybricks-code/blob/master/src/ble-pybricks-service/protocol.ts">Pybricks Code: Protokoll</a>.</p>
+<h3>Stufe 2: Separater AppData-Kanal</h3>
+<p>Die aktuelle API bietet <code>AppData.write_bytes(data)</code> für rohe Bytes zum Host. Damit bleibt die Konsole auch auf Transportebene getrennt. Diesen Kanal würde ich für die eigene IDE prüfen, sobald Firmware und Grundaufzeichnung feststehen. <a href="https://docs.pybricks.com/en/latest/messaging/index.html#pybricks.messaging.AppData">Pybricks: AppData</a>.</p>
+<p>Das Schema bleibt gleich. Ein späteres Binärformat bekommt Typ, Version, Payloadlänge, Sequenznummer und Prüfsumme. Größenlimits, Aufteilung in Pakete und Wiederaufnahme werden gegen die konkrete Protokollversion geprüft. <code>stdout.buffer.write()</code> ist eine weitere dokumentierte Transportmöglichkeit. <a href="https://pybricks.com/projects/tutorials/wireless/hub-to-device/pc-communication/">Pybricks: Hub to PC Communication</a>.</p>
+<div class="note warning"><p><strong>Kein Broadcast für den vollständigen Run.</strong> <code>BLERadio.broadcast()</code> ist auf 26 Bytes pro Nachricht begrenzt. <a href="https://docs.pybricks.com/en/latest/messaging/index.html">Messaging-Dokumentation</a>. Der zusätzliche <code>WRITE_TELEMETRY</code>-Kanal im aktuellen Firmware-Quellcode ist als unveröffentlicht und nicht final markiert. Er ist hier nur ein Beobachtungspunkt. <a href="https://github.com/pybricks/pybricks-micropython/blob/master/lib/pbio/include/pbio/protocol.h">Firmware: protocol.h</a>.</p></div>
+<h3>Speichern darf nicht vom Zeichnen abhängen</h3>
+<p>Vorgesehen ist eine lokale Run-Datenbank im Browser, beispielsweise IndexedDB, mit fortlaufenden Schreibblöcken. Ein Worker übernimmt Parsing und spätere Berechnungen. Der Bluetooth-Zugriff bleibt in dem Browserkontext, der ihn unterstützt. Ein Export enthält Metadaten, Originalsamples, Ereignisse und abgeleitete Posen. Die Cloud-Synchronisation folgt später und ist für die Aufnahme nicht erforderlich.</p>
+<p>Jeder abgeleitete Datensatz nennt die Version des Schätzverfahrens. Nach einer besseren Kalibrierung lässt sich ein alter Run neu berechnen. Die ursprünglichen Messdaten bleiben erhalten. Speicherquote, fehlgeschlagene Schreibvorgänge und Browserbeendigung sind sichtbare Aufnahmefehler, keine stillen Ausnahmen.</p>
+<p>Der Recorder reduziert keine Messdaten für die Bildrate. Das Replay interpoliert Positionen und Quaternionen anhand der Hubzeit. Für eine Liveansicht ist zunächst ein konfigurierbarer Puffer von etwa 100 ms vorgesehen. Größere Lücken werden markiert und nicht als echte Zwischenbewegung ausgegeben. Aufsatzwinkel bleiben über mehrere Umdrehungen kontinuierlich.</p>
+<h3>Eine Funklücke braucht eine ehrliche Verlustanzeige</h3>
+<p>Der Hub bekommt einen begrenzten Puffer, soweit sein gemessener freier RAM reicht. Bei Überlast schützt die Aufzeichnung die Steuerung: Sie verwirft nach einer festgelegten Regel alte Samples und zählt die Verluste. Ereignisse erhalten reservierten Platz. Auch dessen Überlauf muss sichtbar bleiben.</p>
+<p>Ein Rechenbeispiel: 64 kB reine Nutzdaten reichen bei 400 Bytes und 50 Hz für 3,2 Sekunden. Python-Objekte brauchen zusätzlichen Speicher. Das ist keine Zusage, dass dieser Puffer auf eurem Hub verfügbar ist.</p>
+<p>„Jeden Run vollständig“ setzt eine aktive Empfangsverbindung oder ausreichend zuvor geprüften lokalen Speicher voraus. Die dokumentierten 512 Bytes <code>system.storage()</code> reichen nicht für einen solchen Recorder. <a href="https://docs.pybricks.com/en/latest/hubs/primehub.html#pybricks.hubs.PrimeHub.system.storage">PrimeHub: persistenter Speicher</a>. Nach Stromverlust gibt es ohne dauerhafte Kopie keine Wiederherstellungsgarantie.</p>
+<h3>Die IDE als späterer Anschluss</h3>
+<p>Die erste Browserstufe braucht nur Verbinden, Aufnahme, Export und Replay. Editor, Dateibaum und Programmübertragung können danach hinzukommen. Das untersuchte Repository enthält dafür Ansatzpunkte in <code>src/ble-pybricks-service/protocol.ts</code> und <code>src/usb/sagas.ts</code>. Ein Browser-Python-Interpreter allein führt keine Pybricks-Hardware-API als Robotersimulation aus. Dafür braucht die App später einen eigenen API-Adapter.</p>
+<p>Web Bluetooth verlangt einen sicheren Kontext und eine vom Nutzer ausgelöste Geräteauswahl. Die Browserunterstützung ist eingeschränkt. Der erste Kompatibilitätstest erfolgt deshalb auf deinem tatsächlichen Rechner, inklusive Linux-Bluetooth-Stack. <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API">MDN: Web Bluetooth</a>. Programmübertragung und Telemetrie teilen sich einen Verbindungsmanager. Während einer Aufnahme erhält der Programmupload eine Sperre.</p>
+</section>
+<section class="section" id="datenrate">
+<h2>Mehr Samples helfen. Mehr Nachkommastellen beweisen nichts.</h2>
+<p>Als Einstieg schlage ich 50 Hz für die wichtigsten Bewegungssignale vor. 100 Hz und höhere Raten werden erst nach einem Vergleich mit deaktiviertem Logger freigegeben. Der vorhandene 10-ms-Pollingwert ist noch keine garantierte 100-Hz-Abtastung.</p>
+<div class="graphic" id="rate-calculator">
+<h3 style="margin-top:0">Messabstand und Datenmenge abschätzen</h3>
+<p class="meta">Rechner mit Annahmen, keine gemessene Bluetooth-Leistung. Datenmengen ohne Paket- und Datenbank-Overhead. 1 kB = 1.000 Bytes.</p>
+<div class="controls">
+<label>Geschwindigkeit: <output id="speed-value">450</output> mm/s<input id="speed" type="range" min="50" max="1000" step="50" value="450"></label>
+<label>Messrate: <output id="rate-value">50</output> Hz<input id="rate" type="range" min="10" max="500" step="10" value="50"></label>
+<label for="bytes">Angenommene Bytes pro Sample<br><select id="bytes"><option value="200">200 Bytes · kompaktes Beispiel</option><option value="400" selected>400 Bytes · Textbeispiel</option><option value="800">800 Bytes · erweiterter Datensatz</option></select></label>
+<label for="duration">Run-Dauer in Sekunden<br><select id="duration"><option value="60">60 Sekunden</option><option value="150" selected>150 Sekunden · Rechenbeispiel</option><option value="300">300 Sekunden</option></select></label>
+</div>
+<div class="results" aria-live="polite"><span>Weg zwischen Samples<strong><output id="spacing">9,0</output> mm</strong></span><span>Nutzdaten pro Sekunde<strong><output id="throughput">20,0</output> kB</strong></span><span>Nutzdaten pro Run<strong><output id="volume">3,00</output> MB</strong></span></div>
+<p class="mini" style="margin-top:18px">Für höchstens 1 mm Weg zwischen Samples wären bei dieser Geschwindigkeit <strong><output id="needed">450</output> Hz</strong> nötig. Ob der Hub das mit allen ausgewählten Feldern schafft, ist offen. Selbst dann bleibt der Positionsfehler ein eigenes Problem.</p>
+</div>
+<p>Mit den konfigurierten 56-mm-Rädern entspricht 1° Radwinkel rechnerisch ungefähr 0,489 mm Umfangsweg. Das ist eine Umrechnung, keine Genauigkeitsangabe. Ein konstanter Richtungsfehler von 1° verursacht nach einem Meter etwa 17,5 mm seitlichen Fehler.</p>
+<p>Ein kürzeres Geschwindigkeitsfenster kann schnelle Änderungen sichtbarer machen, verstärkt aber Schwankungen. Das Fenster von <code>Motor.speed(window=...)</code> gehört deshalb in die Metadaten. <a href="https://docs.pybricks.com/en/latest/pupdevices/motor.html#pybricks.pupdevices.Motor.speed">Pybricks: Motorgeschwindigkeit</a>.</p>
+<div class="table-scroll"><table><caption>Vorgeschlagene Aufnahmeprofile. Jede Rate muss am vorhandenen Hub geprüft werden.</caption><thead><tr><th>Gruppe</th><th>Startwert</th><th>Zweck</th></tr></thead><tbody>
+<tr><td>Bewegung</td><td>50 Hz</td><td>Kalibrierte Beschleunigung, Drehrate, Orientierung, vier Motorwinkel und Geschwindigkeiten, DriveBase-Zustand.</td></tr>
+<tr><td>Diagnose</td><td>10–20 Hz</td><td>Lastschätzung, Modellzustände, Kraftsensor, IMU-Status. Ereignisse zusätzlich beim Zustandswechsel.</td></tr>
+<tr><td>Versorgung</td><td>1–2 Hz</td><td>Batterie, Ladezustand des Ladecontrollers, Verbindungsstatus.</td></tr>
+<tr><td>Konfiguration</td><td>Start + Änderung</td><td>Ports, Kalibrierung, Regelparameter, Aufsatz, Modellversion und Referenzsysteme.</td></tr>
+<tr><td>Kalibrierprofil</td><td>separater Test</td><td>Zusätzlich unkalibrierte IMU-Werte, Achsenrotationen und weitere Diagnosefelder. Raten einzeln vermessen.</td></tr>
+</tbody></table></div>
+<p>„Alle Daten“ bedeutet hier: alle verfügbaren und relevanten Kategorien erfassen. Langsame Statuswerte müssen nicht hundertmal pro Sekunde übertragen werden. Ein wiederholter API-Aufruf garantiert außerdem keinen neuen Sensorwert.</p>
+</section>
+<section class="section" id="integration">
+<h2>Eure Warteschleifen sind der erste Ansatzpunkt.</h2>
+<p>Die Bestandsaufnahme stammt aus <code>main.py</code>, <code>robot.py</code>, <code>menu.py</code>, <code>programs.py</code> und <code>robot_config.py</code>. <code>robot_config.py</code> war bereits geändert. Diese Änderung bleibt unberührt.</p>
+<div class="table-scroll"><table><thead><tr><th>Heute im Code</th><th>Bedeutung für die Planung</th></tr></thead><tbody>
+<tr><td><code>PrimeHub()</code></td><td>Keine explizite Montageorientierung. Die tatsächliche Einbaulage bleibt zu prüfen.</td></tr>
+<tr><td>A / B</td><td>Linker und rechter Aufsatzmotor. Motortyp und mechanische Übersetzung sind nicht dokumentiert.</td></tr>
+<tr><td>C / D</td><td>Antrieb links gegen den Uhrzeigersinn positiv, rechts im Uhrzeigersinn positiv. Vorwärtsnormierung am echten Roboter prüfen.</td></tr>
+<tr><td>F</td><td>Optionaler <code>ForceSensor</code>. Bei Ausfall <code>None</code>. Port E ist im Code unbelegt.</td></tr>
+<tr><td>56 mm / 112 mm</td><td>Konfigurierter Raddurchmesser und Spurweite. Noch keine nachgewiesene wirksame Geometrie.</td></tr>
+<tr><td><code>use_gyro(True)</code></td><td>DriveBase-Winkel ist nicht unabhängig vom Hub-Gyro. Beide dürfen im Filter nicht als zwei unabhängige Sensoren gelten.</td></tr>
+<tr><td><code>MOTION_POLL_MS = 10</code></td><td>Polling in Fahr- und Motor-Warteschleifen. Laufzeiten der Schleifen kommen zum Warten hinzu.</td></tr>
+<tr><td><code>Menu.run_selected_program()</code></td><td>Das Menü ruft das Programm synchron auf. Ein Logger allein in <code>Menu.run()</code> würde während des Runs aussetzen.</td></tr>
+</tbody></table></div>
+<p>Für den ersten Logger wäre ein zentraler, zeitgesteuerter <code>telemetry.tick()</code> in den vorhandenen Schleifen der kleinste Eingriff. Ansatzpunkte sind <code>Robot._wait_until_done()</code>, <code>Robot.wait()</code>, <code>Robot.drive()</code>, <code>Robot.motor_until_stalled()</code> und das Menü. Auch Startanimation, Nachlauf und Debugbetrieb gehören zum Abdeckungstest.</p>
+<p>Diese Lösung erfasst nur kooperierende Codepfade. Eine lange Python-Berechnung oder ein blockierender Bibliotheksaufruf lässt sich damit nicht parallel abtasten. Die Firmware kann die Motoren weiterregeln, während der Python-Logger keine Zeit bekommt.</p>
+<p>Damit der Aufnahme-Task während des gesamten Programms laufen kann, müssen alle Programmteile regelmäßig Rechenzeit abgeben. Nur einen synchronen Programmaufruf in <code>multitask()</code> einzupacken reicht nicht. Menü, Programmfunktionen und Wartevorgänge brauchen passende Unterbrechungspunkte. Pybricks bietet dafür <code>run_task()</code> und <code>multitask()</code>. <a href="https://docs.pybricks.com/en/latest/tools/index.html#multitasking">Pybricks: Multitasking</a>.</p>
+<p>Die Abbruchprüfung bleibt vor Aufnahme und Versand. Auch wenn der optionale Logger fehlschlägt, muss die Steuerung die Motoren stoppen können. Ein Versand, der beliebig lange blockiert, erfüllt dieses Ziel nicht. Deshalb ist der Überlasttest eine Voraussetzung vor dem Einbau in echte Fahrprogramme.</p>
+<p>Die aktuellen Debugmotoren starten direkt in <code>Menu.update_debug_motor()</code>. Auch diese Befehle brauchen Ereignisse. <code>motor_until_stalled()</code> beendet die Bewegung am Anschlag, setzt aber im aktuellen Code keinen expliziten Gelenknullpunkt. Für Aufsatz-Replay braucht jeder Aufsatz eine bekannte Referenz.</p>
+</section>
+</article>
+<article aria-label="Referenz: Datenquellen und geplanter Datenvertrag">
+<section class="section" id="messdaten">
+<h2>Messdatenkatalog für euren PrimeHub.</h2>
+<p>Die Tabellen unterscheiden Sensorwerte, firmwareseitige Schätzungen, Status und Konfiguration. Erfasst sind die dokumentierten öffentlichen Lesezugriffe für eure Hardware. Interne Firmware-Diagnosekanäle und nicht angeschlossene Geräte gehören nicht zum zugesicherten Umfang.</p>
+<div class="note"><p><strong>Dokumentationsstand: 4.1.0b1 unter <code>latest</code>.</strong> Die Hub-Firmware ist unbekannt. APIs werden vor dem Run anhand der Version und erfolgreicher Leseproben freigeschaltet. Fehlende Felder erhalten <code>null</code> und einen Grund. Es erfolgt kein automatisches Firmwareupdate.</p></div>
+<h3>Hub und IMU</h3>
+<p class="meta">Quelle für diese Tabelle: <a href="https://docs.pybricks.com/en/latest/hubs/primehub.html">PrimeHub-Dokumentation</a>. Einheiten sind Pybricks-Einheiten.</p>
+<div class="table-scroll"><table><thead><tr><th>API</th><th>Wert</th><th>Art</th></tr></thead><tbody>
+<tr><td><code>imu.acceleration()</code></td><td>X, Y, Z · mm/s²</td><td>Kalibrierte Sensorwerte</td></tr>
+<tr><td><code>imu.acceleration(calibrated=False)</code></td><td>X, Y, Z · mm/s²</td><td>Unkalibriert, keine ADC-Rohzahlen</td></tr>
+<tr><td><code>imu.angular_velocity()</code></td><td>X, Y, Z · °/s</td><td>Kalibrierte Sensorwerte</td></tr>
+<tr><td><code>imu.angular_velocity(calibrated=False)</code></td><td>X, Y, Z · °/s</td><td>Unkalibriert</td></tr>
+<tr><td><code>imu.orientation()</code></td><td>3×3-Matrix</td><td>Geschätzte Orientierung</td></tr>
+<tr><td><code>imu.heading()</code></td><td>Aufsummierte Drehung · °</td><td>Geschätzt</td></tr>
+<tr><td><code>imu.tilt(calibrated=True/False)</code></td><td>Pitch, Roll · °</td><td>Geschätzt</td></tr>
+<tr><td><code>imu.rotation(axis, calibrated=True/False)</code></td><td>Achsenrotation · °</td><td>Integriert, keine allgemeinen Eulerwinkel</td></tr>
+<tr><td><code>imu.up(calibrated=True/False)</code></td><td>Obere Seite</td><td>Klassifikation</td></tr>
+<tr><td><code>imu.ready()</code>, <code>imu.stationary()</code></td><td>Boolesche Zustände</td><td>Kalibrierung, Stillstand</td></tr>
+<tr><td><code>imu.settings()</code></td><td>Schwellen, Headingkorrektur, Bias, Skalen, Beschleunigungskorrektur</td><td>Konfiguration</td></tr>
+<tr><td><code>buttons.pressed()</code></td><td>Tastenmenge</td><td>Eingabe</td></tr>
+<tr><td><code>battery.voltage()</code>, <code>battery.current()</code></td><td>mV, mA</td><td>Gesamtversorgung</td></tr>
+<tr><td><code>charger.connected()</code>, <code>charger.current()</code>, <code>charger.status()</code></td><td>Boolesch, mA, Statuscode</td><td>Ladecontroller</td></tr>
+<tr><td><code>system.info()</code></td><td>Name, Resetgrund, BLE, USB, Startart, Programm-ID</td><td>Systemstatus</td></tr>
+<tr><td><code>speaker.volume()</code></td><td>%</td><td>Konfiguration, keine Schallmessung</td></tr>
+</tbody></table></div>
+<p class="mini"><code>True/False</code> bezeichnet in dieser Referenz zwei getrennte Aufrufvarianten. Achsenvarianten werden jeweils für X, Y und Z gelesen. Mehrere API-Aufrufe bilden keinen atomaren Snapshot.</p>
+<h3>Vier Motoren</h3>
+<p class="meta">Jeweils für A, B, C und D. Quelle: <a href="https://docs.pybricks.com/en/latest/pupdevices/motor.html">Motor-Dokumentation</a>.</p>
+<div class="table-scroll"><table><thead><tr><th>API</th><th>Wert</th><th>Art</th></tr></thead><tbody>
+<tr><td><code>angle()</code></td><td>Winkel · °</td><td>Encoder</td></tr>
+<tr><td><code>speed(window=...)</code></td><td>Geschwindigkeit · °/s</td><td>Aus Encoderfenster</td></tr>
+<tr><td><code>load()</code></td><td>Lastmoment · mNm</td><td>Schätzung</td></tr>
+<tr><td><code>stalled()</code>, <code>done()</code></td><td>Blockiert, fertig</td><td>Reglerstatus</td></tr>
+<tr><td><code>model.state()</code></td><td>Winkel, Geschwindigkeit, Strom, Blockierung · °, °/s, mA, boolesch</td><td>Modellschätzungen</td></tr>
+<tr><td><code>settings()</code></td><td>Spannungsgrenze · mV</td><td>Konfiguration</td></tr>
+<tr><td><code>control.limits()</code></td><td>Geschwindigkeits-, Beschleunigungs-, Drehmomentgrenzen</td><td>Konfiguration</td></tr>
+<tr><td><code>control.pid()</code></td><td>Reglerparameter</td><td>Konfiguration</td></tr>
+<tr><td><code>control.target_tolerances()</code>, <code>control.stall_tolerances()</code></td><td>Ziel- und Blockiertoleranzen</td><td>Konfiguration</td></tr>
+<tr><td><code>control.scale</code>, <code>model.settings()</code></td><td>Übersetzung, Modellparameter</td><td>Konfiguration</td></tr>
+</tbody></table></div>
+<p><code>model.state()</code> liefert keinen gemessenen Einzelmotorstrom. <code>load()</code> ersetzt keinen Kraftsensor am Aufsatz. <code>dc(duty)</code> ist ein Befehl, kein Getter für die aktuelle PWM. Ein eingestelltes Getriebe kann die Bedeutung von Motorwinkeln verändern. Deshalb werden Port, Motortyp, Vorzeichen und Übersetzung mitgespeichert.</p>
+<h3>DriveBase</h3>
+<p class="meta">Quelle: <a href="https://docs.pybricks.com/en/latest/robotics.html">Robotics-Dokumentation</a>.</p>
+<div class="table-scroll"><table><thead><tr><th>API</th><th>Wert</th><th>Art</th></tr></thead><tbody>
+<tr><td><code>distance()</code></td><td>Strecke · mm</td><td>Odometrierschätzung</td></tr>
+<tr><td><code>angle()</code></td><td>Aufsummierter Winkel · °</td><td>Gyro oder Radodometrie</td></tr>
+<tr><td><code>state()</code></td><td>Strecke, Geschwindigkeit, Winkel, Drehrate · mm, mm/s, °, °/s</td><td>Kombinierter Zustand</td></tr>
+<tr><td><code>done()</code>, <code>stalled()</code></td><td>Fertig, blockiert</td><td>Reglerstatus</td></tr>
+<tr><td><code>settings()</code></td><td>Fahr- und Drehprofile</td><td>Konfiguration</td></tr>
+<tr><td><code>distance_control</code>, <code>heading_control</code></td><td>Reglergrenzen, PID, Ziel- und Blockiertoleranzen, Skalierung entsprechend Control-API</td><td>Konfiguration</td></tr>
+</tbody></table></div>
+<p><code>state()</code> enthält bereits die Werte aus <code>distance()</code> und <code>angle()</code>. Separate Aufrufe sind für den normalen Stream redundant. Mit aktivem Gyro stammen Winkel und Drehrate vom Gyro. <code>reset()</code> und <code>use_gyro()</code> können die laufende Bewegung stoppen. Ein Recorder ruft diese Methoden nicht zum Messen auf.</p>
+<h3>Kraftsensor an F</h3>
+<div class="table-scroll"><table><caption>Quelle: <a href="https://docs.pybricks.com/en/latest/pupdevices/forcesensor.html">ForceSensor-Dokumentation</a>.</caption><thead><tr><th>API</th><th>Wert</th><th>Grenze</th></tr></thead><tbody>
+<tr><td><code>force()</code></td><td>N</td><td>Kraft am Sensortaster, ungefähr bis 10 N.</td></tr>
+<tr><td><code>distance()</code></td><td>mm</td><td>Tasterweg, ungefähr bis 8 mm. Kein Abstand zum Spielfeld.</td></tr>
+<tr><td><code>pressed(force=3)</code></td><td>Boolesch</td><td>Drücken oberhalb der konfigurierten Kraftschwelle.</td></tr>
+<tr><td><code>touched()</code></td><td>Boolesch</td><td>Auch leichte Tasterbewegung.</td></tr>
+</tbody></table></div>
+<h3>Zusätzliche Daten ohne neuen Sensor</h3>
+<p><code>StopWatch.time()</code> liefert die Aufnahmezeit in Millisekunden. <code>usys.version</code> beschreibt Python-Kompatibilität, Pybricks-Version und Builddatum. <a href="https://docs.pybricks.com/en/latest/tools/index.html">Timing-Dokumentation</a> und <a href="https://docs.pybricks.com/en/latest/micropython/usys.html">usys-Dokumentation</a>.</p>
+<p>Die Anwendung erzeugt außerdem Run-IDs, Sample-Sequenzen, Abtastdauer, verworfene Samples, Fehler, Menüauswahl und Befehlsereignisse. Dazu gehören Sollgeschwindigkeit, Sollwinkel, Zielstrecke, Stoppmodus und Timeout. Diese Werte beschreiben die Absicht des Programms, nicht den erreichten Zustand. Display- und Lichtbefehle können bei Bedarf ebenfalls als Ereignisse aufgezeichnet werden.</p>
+<h3>Später angeschlossene Sensoren</h3>
+<p>Ein <a href="https://docs.pybricks.com/en/latest/pupdevices/colorsensor.html">ColorSensor</a> liefert <code>color()</code>, <code>hsv()</code>, <code>reflection()</code> und <code>ambient()</code>. <code>color()</code> und <code>hsv()</code> unterstützen auch <code>surface=False</code>. <code>detectable_colors()</code> liest die Farbkonfiguration. Ein <a href="https://docs.pybricks.com/en/latest/pupdevices/ultrasonicsensor.html">UltrasonicSensor</a> liefert <code>distance()</code> und <code>presence()</code>. Diese Sensoren sind aktuell nicht initialisiert. Moduswechsel können die Abtastrate verändern.</p>
+<h3>Kein Messfeld dafür vorhanden</h3>
+<p>Die untersuchten öffentlichen APIs liefern keine absolute Feldposition, keinen direkten Höhenwert, keine gemessene Bodenreibung und keine Masse oder Schwerpunktlage. Ebenso fehlt ein allgemeiner Getter für reale Kontaktkräfte, Einzelmotor-PWM und Einzelmotor-Temperatur. Batterieprozente lassen sich aus der Spannung allein nicht verlässlich ableiten.</p>
+</section>
+<section class="section" id="format">
+<h2>Ein Datenvertrag, der alte Runs lesbar hält.</h2>
+<p>Dies ist ein vorgeschlagenes Schema, keine vorhandene Pybricks-Funktion. Vier Datensatztypen reichen für den Anfang: <code>meta</code>, <code>sample</code>, <code>event</code> und <code>end</code>. Der Browser ergänzt daraus <code>pose</code>-Datensätze.</p>
+<div class="table-scroll"><table><thead><tr><th>Typ</th><th>Inhalt</th></tr></thead><tbody>
+<tr><td><code>meta</code></td><td>Schemaversion, Session-ID, Run-ID, Firmware, Capability-Liste, Programmauswahl, Codehash, Konfigurationssnapshot, Motortypen, Montage, Einheiten, Abtastraten, Geschwindigkeitsfenster, Feld- und Modellversion, Aufsatz-ID, Startpose und deren Herkunft.</td></tr>
+<tr><td><code>sample</code></td><td>Session-ID, Run-ID, Sequenz, Hubzeit, Beginn und Ende des Lesezyklus, IMU, vier Motoren, DriveBase, optionale Sensoren, Gültigkeitsfelder und Verlustzähler.</td></tr>
+<tr><td><code>event</code></td><td>Hubzeit, eigene Sequenz, Befehls-ID, Aufrufparameter, Start und Ende, Reset vor und nach der Änderung, Aufsatzwechsel, Referenzpose, Stopp, Timeout, Fehler und Verbindungslücke.</td></tr>
+<tr><td><code>end</code></td><td>Ergebnis, letzte Sequenz, erzeugte und verworfene Samples. Der Browser ergänzt empfangene und dauerhaft gespeicherte Anzahl.</td></tr>
+<tr><td><code>pose</code></td><td>Quellzeit, <code>x_mm</code>, <code>y_mm</code>, <code>z_mm</code>, Quaternion <code>[x,y,z,w]</code>, Schätzerversion, Kalibrierung, Herkunft und Unsicherheit. Fehlende Unsicherheit bleibt unbekannt.</td></tr>
+</tbody></table></div>
+<details open><summary>Lesbares Sample-Beispiel ansehen</summary>
+<p class="meta">Synthetische Werte. Hier umgebrochen zur Erklärung. Auf dem Transport ist dies eine einzige Zeile. Motorarrays: Winkel in Grad, Geschwindigkeit in Grad pro Sekunde, Lastschätzung in mNm, blockiert, fertig. <code>imu_R_row_major</code>: neun Matrixwerte zeilenweise.</p>
+<pre><code>@BG1 {"v":1,"type":"sample","session":"demo-session","run":"demo-run","seq":42,"t_ms":840,"read_end_ms":842,"imu_a_mm_s2":[0,0,9807],"imu_w_deg_s":[0,0,0],"imu_R_row_major":[1,0,0,0,1,0,0,0,1],"heading_deg":0,"motors":{"A":[0,0,0,false,true],"B":[75,0,0,false,true],"C":[180,0,0,false,true],"D":[180,0,0,false,true]},"drive":[88,0,0,0],"force_N":null,"validity":{"force":"not_connected"},"dropped_total":0}</code></pre>
+</details>
+<p>Vektoren und Matrizen werden explizit in Zahlenarrays umgewandelt. Enums erhalten stabile Namen oder definierte Codes. Python-Tupel, <code>True</code> und Objekt-Repräsentationen sind kein JSON. <code>NaN</code> und unendliche Zahlen sind im Datenvertrag nicht erlaubt.</p>
+<h3>Zeit und Lebenszyklus</h3>
+<p>Eine Hubuhr läuft über das Menü und mehrere Runs hinweg. Pro Run wird eine neue ID mit Startzeit gespeichert. Ein Hubneustart beginnt eine neue Session. Jede langsamere Datengruppe erhält ihren eigenen Zeitstempel oder ihr Alter, statt einen alten Batteriewert als frisch auszugeben.</p>
+<p>Der Browser speichert Empfangszeit und Hubzeit getrennt. Für Kameradaten braucht er eine geschätzte Uhrabbildung mit Unsicherheit. Die Ankunftszeit eines Pakets ist kein Aufnahmezeitpunkt. Die Spanne zwischen <code>t_ms</code> und <code>read_end_ms</code> macht die zeitliche Streuung eines Samples sichtbar.</p>
+<p>Nach einer Wiederverbindung sendet der Hub Metadaten erneut. Doppelte Samples werden über Session, Run und Sequenz erkannt. Alte Pufferdaten behalten ihre ursprüngliche Zeit. Ein Reset erzeugt ein Ereignis und einen neuen Bezugsabschnitt. Der Browser interpretiert einen Winkelsprung nicht als Bewegung.</p>
+<p>Fehlt <code>end</code>, gilt der Run als unterbrochen. Das betrifft auch einen Hardware-Stopp über die Bluetooth-Taste, Stromverlust oder einen Programmabbruch ohne Abschlussdatensatz. Ein <code>finally</code>-Block ist keine Garantie, dass der Browser das letzte Paket erhält.</p>
+<h3>Gültigkeit statt erfundener Präzision</h3>
+<p>Vorgesehene Kennzeichnungen sind <code>measured</code>, <code>estimated</code>, <code>assumed</code>, <code>stale</code>, <code>unavailable</code> und <code>gap</code>. Sie gelten pro Feld oder klar definierter Datengruppe. Eine qualitativ niedrige Vertrauensstufe ist kein statistischer Fehlerbalken. Eine Kovarianz wird erst ausgegeben, wenn das Schätzverfahren sie begründet berechnet.</p>
+</section>
+</article>
+<article aria-label="Vorgeschlagene Vorgehensweise, noch nicht ausgeführt">
+<section class="section" id="umsetzung">
+<h2>Baue zuerst einen nachprüfbaren Recorder.</h2>
+<p>Die folgenden Schritte sind der Vorschlag für den nächsten Auftrag. Keiner davon wurde an der Robotersteuerung ausgeführt.</p>
+<div class="phase"><span>1</span><div><h3>Prüfe Firmware und Koordinaten</h3><ol><li>Lies Firmware, Hubstatus und verfügbare APIs aus.</li><li>Erfasse Motortypen, Hubmontage, Aufsatzübersetzungen und Modellachsen.</li><li>Prüfe die Vorzeichen mit Vorwärtsfahrt und Drehung um jede Achse.</li><li>Lege den Feldursprung und die Startpose fest.</li></ol><p><strong>Ergebnis:</strong> ein Capability-Bericht und ein versionierter Koordinatenvertrag. Fehlende APIs blockieren nur das zugehörige Feld.</p></div></div>
+<div class="phase"><span>2</span><div><h3>Vermesse Aufnahme und Transport</h3><ol><li>Baue ein separates Telemetrie-Testprogramm.</li><li>Miss Lesezeit, Serialisierung und Versand zunächst ohne Fahrbewegung.</li><li>Teste USB und Bluetooth mit 10, 25, 50 und 100 Hz.</li><li>Trenne die Verbindung und prüfe das Verhalten bei vollem Puffer.</li><li>Wähle das schnellste Profil, das die vereinbarten Laufzeitgrenzen einhält.</li></ol><p><strong>Ergebnis:</strong> gemessene Rate, maximale Lücke, Datenvolumen und Verlustrate je Profil. Erst danach steht die produktive Abtastrate fest.</p></div></div>
+<div class="phase"><span>3</span><div><h3>Erfasse ganze Runs in der bestehenden Steuerung</h3><ol><li>Ergänze einen zentralen Logger mit deaktivierbarem Schalter.</li><li>Verbinde alle Warteschleifen, das Menü und den Debugbetrieb mit dem Logger.</li><li>Protokolliere Bewegungsbefehle, Stoppmodi und Abschlüsse.</li><li>Ordne jedem ausgewählten Programm eine neue Run-ID zu.</li><li>Teste Abbruch, Timeout und fehlenden Kraftsensor.</li></ol><p><strong>Ergebnis:</strong> jeder erfasste Run besitzt ein Ergebnis oder eine sichtbare Unterbrechungsmarkierung. Aufnahmelücken bleiben erkennbar.</p></div></div>
+<div class="phase"><span>4</span><div><h3>Baue Recorder und Replay im Browser</h3><ol><li>Verbinde den Browser mit dem Hub.</li><li>Speichere empfangene Rohdaten blockweise.</li><li>Prüfe Parser und Wiederaufnahme mit künstlich geteilten Paketen.</li><li>Berechne ebene Odometriedaten und räumliche Orientierung.</li><li>Verbinde Modellkörper, Räder und Aufsatzgelenke mit der Zeitleiste.</li><li>Ergänze Export, Pause und zeitgenaues Springen im Run.</li></ol><p><strong>Ergebnis:</strong> derselbe Export ergibt bei derselben Schätzerversion dasselbe Replay. Der Browser benötigt dafür keinen angeschlossenen Roboter.</p></div></div>
+<div class="phase"><span>5</span><div><h3>Kalibriere mit unabhängigen Messungen</h3><ol><li>Miss gerade Strecken vorwärts und rückwärts.</li><li>Prüfe Drehungen in beide Richtungen und wiederholte Rechteckfahrten.</li><li>Wiederhole die Tests mit den vorgesehenen Aufsätzen und Lasten.</li><li>Erfasse externe Referenzposen entlang der Strecke.</li><li>Bewerte Position, Orientierung und Zeitversatz getrennt.</li></ol><p><strong>Ergebnis:</strong> Fehlerverteilungen je Aufbau. Radparameter, IMU-Korrektur und Schlupf werden getrennt betrachtet. Gleiche Reifenform allein ist keine Kalibrierung.</p></div></div>
+<div class="phase"><span>6</span><div><h3>Erweitere die App um Physiksimulation</h3><ol><li>Definiere die verwendete Teilmenge der Pybricks-API als Simulatoradapter.</li><li>Ergänze Motorregelung, Trägheit, Reibung, Gelenkgrenzen und Kontaktgeometrie.</li><li>Schätze Parameter aus Trainingsruns.</li><li>Prüfe die Simulation an anderen, zuvor ungenutzten Runs.</li><li>Zeige Replay und Vorhersage als getrennte Spuren.</li></ol><p><strong>Ergebnis:</strong> ein bewertetes Simulationsmodell. Ein per Pose gesteuertes Replay dient als Vergleich, nicht als Beweis korrekter Physik.</p></div></div>
+</section>
+<section class="section" id="abnahme">
+<h2>Prüfe zuerst, ob das Messen den Run verändert.</h2>
+<p>Die folgenden Grenzen sind vorgeschlagene Abnahmekriterien. Sie müssen vor der Implementierung mit euch festgelegt werden. Es gibt noch keine Messergebnisse.</p>
+<div class="table-scroll"><table><thead><tr><th>Test</th><th>Nachweis</th></tr></thead><tbody>
+<tr><td>Logger aus gegen an</td><td>Je zehn Wiederholungen eines identischen kurzen Programms. Laufzeit, Endpose und Abbruchlatenz vergleichen. Zielvorschlag: höchstens 5 % zusätzliche Programmlaufzeit und kein zusätzlicher Abbruchverzug oberhalb 20 ms.</td></tr>
+<tr><td>Abtastung</td><td>Median, 95. Perzentil und Maximum der tatsächlichen Sampleabstände berichten. Bei 50 Hz: Zielwert 20 ms, vorgeschlagenes 95. Perzentil höchstens 25 ms. Keine stillen Lücken.</td></tr>
+<tr><td>Vollständigkeit</td><td>Erzeugte, verworfene, empfangene und gespeicherte Sequenzen abgleichen. Für Referenzruns gilt: null fehlende Samples. Überlasttests dürfen Verluste erzeugen, müssen sie aber vollständig melden.</td></tr>
+<tr><td>Parser</td><td>Jede mögliche Trennstelle eines Beispiels testen. Mehrere Zeilen pro Paket, UTF-8-Teilzeichen, Textlogs, ungültiges JSON, unbekannte Version und überlange Zeilen einschließen. Zeilenlimit zunächst 8 KiB, große Metadaten auf definierte Records aufteilen.</td></tr>
+<tr><td>Fehlersituationen</td><td>Funkverlust, langsames Speichern, Hintergrundtab, volle Browserquote, Stopptaste, Timeout und Neustart testen. Motorstopps bleiben unabhängig von Recorder und Cloud.</td></tr>
+<tr><td>Gelenke und Achsen</td><td>90° je Achse, kombinierte Drehung, mehrere Radumdrehungen und Aufsatz-Homing prüfen. Keine spiegelverkehrten Bewegungen, Winkelsprünge oder doppelt angewendete Übersetzungen.</td></tr>
+<tr><td>Positionsgüte</td><td>Endpunktfehler und Fehler entlang der Strecke getrennt auswerten. RMSE, 95. Perzentil und Maximum in mm sowie Orientierungsfehler in Grad berichten. Referenzunsicherheit mit angeben.</td></tr>
+</tbody></table></div>
+<h3>Diese Angaben fehlen noch</h3>
+<p>Für den Start braucht es die installierte Firmwareversion, die genaue Hubmontage, die Motortypen sowie die Achsen und den Ursprung des 3D-Modells. Für glaubwürdige Aufsatzbewegungen fehlen Gelenkachsen, Übersetzungen und Nullstellungen.</p>
+<p>Für „millimetergenau“ muss außerdem klar sein, was gemeint ist: Endpunkt, ganze Trajektorie oder einzelne Gelenke, über welche Run-Dauer und in welchem Fehlermaß. Ohne diese Definition lässt sich das Ziel nicht abnehmen.</p>
+<p>Für Training mit Kamera und Funk wird zunächst nur ein Laboraufbau geplant. Ob dieser Aufbau bei einem konkreten FLL-Wettbewerb zulässig ist, muss gesondert anhand des dort geltenden Regelwerks geprüft werden. Dieser Plan trifft dazu keine Aussage.</p>
+<div class="note"><p><strong>Nächster sinnvoller Auftrag:</strong> Firmware und Achsen prüfen, dann einen isolierten Aufnahme-Benchmark bauen. Die bestehende Routensteuerung bleibt bis zu diesem Nachweis unverändert.</p></div>
+</section>
+</article>
+<section class="section" id="quellen">
+<h2>Quellen und Grenzen der Recherche.</h2>
+<p>Gelesen am 8. September 2026. <code>latest</code> und GitHub <code>master</code> sind bewegliche Quellen. Für die Implementierung werden konkrete Versionen beziehungsweise Commits festgehalten. Die folgenden Links ergänzen die Belege direkt im Text.</p>
+<ul class="sources">
+<li><a href="https://docs.pybricks.com/en/latest/hubs/">Pybricks: Hubs-Übersicht</a> · Auswahl des zum Code passenden PrimeHub.</li>
+<li><a href="https://docs.pybricks.com/en/latest/hubs/primehub.html">PrimeHub</a> · IMU, Versorgung, Tasten, System und Speicher.</li>
+<li><a href="https://docs.pybricks.com/en/latest/robotics.html">Robotics</a> · DriveBase. Die Car-Klasse gehört nicht zum vorliegenden Antrieb.</li>
+<li><a href="https://docs.pybricks.com/en/latest/pupdevices/motor.html">Motor</a> und <a href="https://docs.pybricks.com/en/latest/pupdevices/forcesensor.html">ForceSensor</a> · angeschlossene Geräte.</li>
+<li><a href="https://docs.pybricks.com/en/latest/messaging/index.html">Messaging</a>, <a href="https://docs.pybricks.com/en/latest/tools/index.html">Tools</a> und <a href="https://docs.pybricks.com/en/latest/micropython/usys.html">usys</a> · Transport und Laufzeit.</li>
+<li><a href="https://github.com/pybricks/pybricks-code">Pybricks Code</a> · Referenz für die spätere IDE. Untersucht wurden README, Paketmanifest, Dateistruktur und Protokollstellen. Kein vollständiges Architektur- oder Lizenzreview.</li>
+<li><a href="https://github.com/pybricks/pybricks-micropython/blob/master/lib/pbio/include/pbio/protocol.h">Pybricks-Firmware: Protokoll</a> · insbesondere der unveröffentlichte Telemetriekanal.</li>
+<li><a href="https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/differential-drive-odometry.html">WPILib: Odometry</a> und <a href="https://docs.wpilib.org/en/stable/docs/software/advanced-controls/state-space/state-space-pose-estimators.html">Pose Estimators</a> · methodische Referenzen, keine einzubauende Abhängigkeit.</li>
+</ul>
+<p class="mini">Nicht ausgeführt: Firmwareabfrage, Messfahrten, Verbindungsbenchmark, Kameratest und Modellimport. Der nicht abrufbare Einstieg <code>ble.pybricks.com</code> wurde durch offizielle Protokollquellen und das Pybricks-Kommunikationstutorial ersetzt.</p>
+</section>
+<section class="section" id="redaktion">
+<h2>Textprüfung nach Technical Writing und Unslop.</h2>
+<p>Die Lesefassung trennt Erklärung, Nachschlageteil und geplantes Vorgehen in eigene Dokumentabschnitte. API-Namen, Einheiten und Annahmen bleiben ausdrücklich erhalten. Der gesamte Text wurde auf Füllsätze und unbelegte Präzisionsversprechen geprüft.</p>
+<div class="table-scroll"><table><thead><tr><th>Vorher im Entwurf</th><th>Nach der Prüfung</th></tr></thead><tbody>
+<tr><td>Die Anzeige erhält daraus eine zeitlich passende Auswahl.</td><td>Die Anzeige wählt die Daten passend zur Wiedergabezeit aus.</td></tr>
+<tr><td>Für die spätere Zusage „überall während des Programms“ braucht es einen durchgehend kooperativen Aufbau mit einem Aufnahme-Task.</td><td>Damit der Aufnahme-Task während des gesamten Programms laufen kann, müssen alle Programmteile regelmäßig Rechenzeit abgeben.</td></tr>
+<tr><td>Fehler des optionalen Loggers dürfen die Motor-Stopp-Logik nicht überspringen.</td><td>Auch wenn der optionale Logger fehlschlägt, muss die Steuerung die Motoren stoppen können.</td></tr>
+</tbody></table></div>
+<p>Die Überarbeitung ersetzt abstrakte Vorgänge durch handelnde Programmteile und benennt die zeitliche Bedingung genauer. Der Vergleich zwischen Replay und Simulation bleibt erhalten, weil er zwei verschiedene Funktionen beschreibt.</p>
+<details><summary>Vorschlag für den Unslop-Katalog</summary><p>Nur ein Vorschlag aus dem Technical-Writing-Standard. Die Skill-Datei wurde nicht verändert.</p><pre><code>+ „Datenpipeline orchestrieren“ → „Samples empfangen, prüfen und speichern“.
+ Benenne die einzelnen Aktionen statt eines abstrakten Gesamtvorgangs.</code></pre></details>
+</section>
+<footer class="foot">Bioglow · Technischer Plan, kein Messbericht. Alle interaktiven Zahlen sind berechnete Beispiele. Diese Datei benötigt keine externen Skripte, Schriftarten oder Netzwerkzugriffe.</footer>
+</main>
+</div>
+<script>
+(() => {
+  const ids = ['speed','rate','bytes','duration'];
+  const inputs = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+  const format = (value, digits) => value.toLocaleString('de-DE',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+  function update() {
+    const speed = Number(inputs.speed.value), rate = Number(inputs.rate.value);
+    const bytes = Number(inputs.bytes.value), duration = Number(inputs.duration.value);
+    const values = {'speed-value':format(speed,0),'rate-value':format(rate,0),spacing:format(speed/rate,1),throughput:format(bytes*rate/1000,1),volume:format(bytes*rate*duration/1000000,2),needed:format(speed,0)};
+    for (const [id,value] of Object.entries(values)) document.getElementById(id).textContent = value;
+  }
+  Object.values(inputs).forEach(input => input.addEventListener('input',update));
+  update();
+})();
+</script>
+</body>
+</html>
