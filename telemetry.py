@@ -89,7 +89,9 @@ class Telemetry:
         self.buffer_full = False
 
     def begin(self, name):
-        self.run_id = (self.run_id + 1) & 0xFFFFFFFF
+        # Pybricks verwendet kleine 30-Bit-Integer. 0xFFFFFFFF und die vollen
+        # int32-Grenzen lösen bereits beim Laden des Moduls einen Overflow aus.
+        self.run_id = (self.run_id + 1) & 0x3FFFFFFF
         self.run_name = str(name)[:80]
         self.started_ms = self.clock.time()
         self.next_sample_ms = self.started_ms
@@ -132,7 +134,7 @@ class Telemetry:
             for row in range(3):
                 for column in range(3):
                     matrix.append(_clamp(orientation[row, column] * 32767, -32767, 32767))
-            motor_angles = [_clamp(motor.angle(), -2147483648, 2147483647) for motor in self.motors]
+            motor_angles = [_clamp(motor.angle(), -1073741823, 1073741823) for motor in self.motors]
             motor_speeds = [_clamp(motor.speed(), -32768, 32767) for motor in self.motors]
             motor_loads = []
             flags = 0
@@ -165,13 +167,13 @@ class Telemetry:
                 *[_clamp(value / 4, -32768, 32767) for value in acceleration],
                 *[_clamp(value * 10, -32768, 32767) for value in angular],
                 *matrix,
-                _clamp(self.hub.imu.heading() * 10, -2147483648, 2147483647),
+                _clamp(self.hub.imu.heading() * 10, -1073741823, 1073741823),
                 *motor_angles,
                 *motor_speeds,
                 *motor_loads,
-                _clamp(drive[0], -2147483648, 2147483647),
+                _clamp(drive[0], -1073741823, 1073741823),
                 _clamp(drive[1], -32768, 32767),
-                _clamp(drive[2] * 10, -2147483648, 2147483647),
+                _clamp(drive[2] * 10, -1073741823, 1073741823),
                 _clamp(drive[3] * 10, -32768, 32767),
                 force,
                 flags,
@@ -193,8 +195,8 @@ class Telemetry:
             self.clock.time() - self.started_ms,
             identifier,
             phase,
-            _clamp(value1, -2147483648, 2147483647),
-            _clamp(value2, -2147483648, 2147483647),
+            _clamp(value1, -1073741823, 1073741823),
+            _clamp(value2, -1073741823, 1073741823),
         )
         if self._append(record):
             self.events += 1

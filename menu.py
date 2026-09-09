@@ -1,6 +1,5 @@
 from pybricks.parameters import Button
 from pybricks.tools import StopWatch, wait
-import umath
 
 from robot import MotionTimeout, ProgramAborted
 
@@ -207,8 +206,9 @@ class Menu:
 
         if force_pressed:
             try:
-                # exponential speed mapping für debug motor
-                speed = umath.exp(self.force_sensor.force())
+                # Begrenzte Kennlinie: Pybricks unterstützt keine Long-Integer.
+                force = max(0, min(10, self.force_sensor.force()))
+                speed = 100 + int(force * force * 9)
             except Exception as error:
                 print("FORCE_SENSOR_ERROR", str(error))
                 speed = 200
