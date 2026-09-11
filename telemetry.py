@@ -103,6 +103,16 @@ class Telemetry:
         self.active = True
         self.tick(force=True)
 
+    def _metadata(self):
+        return struct.pack(
+            "<HHHHH",
+            config.TELEMETRY_SAMPLE_MS,
+            int(round(config.WHEEL_DIAMETER_MM * 10)),
+            int(round(config.AXLE_TRACK_MM * 10)),
+            struct.calcsize(SAMPLE_FORMAT),
+            struct.calcsize(EVENT_FORMAT),
+        ) + bytes(self.run_name, "utf-8")
+
     def _append(self, record):
         if self.buffer_full or len(self.data) + len(record) > config.TELEMETRY_MAX_BYTES:
             self.buffer_full = True
@@ -219,16 +229,7 @@ class Telemetry:
         self.tick(force=True)
         self.active = False
         sequence = 0
-        name = self.run_name.encode("utf-8")
-        meta = struct.pack(
-            "<HHHHH",
-            config.TELEMETRY_SAMPLE_MS,
-            config.WHEEL_DIAMETER_MM,
-            config.AXLE_TRACK_MM,
-            struct.calcsize(SAMPLE_FORMAT),
-            struct.calcsize(EVENT_FORMAT),
-        ) + name
-        self._send(self._packet(0, sequence, meta))
+        self._send(self._packet(0, sequence, self._metadata()))
         sequence += 1
         for offset in range(0, len(self.data), PACKET_PAYLOAD):
             self._send(self._packet(1, sequence, self.data[offset:offset + PACKET_PAYLOAD]))

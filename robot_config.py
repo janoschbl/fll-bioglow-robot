@@ -9,8 +9,8 @@ FORCE_SENSOR_PORT = Port.F
 LEFT_DRIVE_DIRECTION = Direction.COUNTERCLOCKWISE
 RIGHT_DRIVE_DIRECTION = Direction.CLOCKWISE
 
-WHEEL_DIAMETER_MM = 56
-AXLE_TRACK_MM = 112
+WHEEL_DIAMETER_MM = 62.4
+AXLE_TRACK_MM = 80
 
 # TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
 DEFAULT_STRAIGHT_SPEED = 450
@@ -37,7 +37,7 @@ STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3
 STALL_MIN_PROGRESS_RATIO = 0.10
 
-# Run-Telemetrie: 50 Hz, vollständig im RAM gepuffert und erst nach dem Run
-# übertragen. Reicht der Puffer nicht, wird der Verlust im Abschluss gemeldet.
+# Run-Telemetrie: während des gesamten Programms mit 50 Hz puffern und erst
+# nach Programmende als einen vollständigen Run übertragen.
 TELEMETRY_SAMPLE_MS = 20
 TELEMETRY_MAX_BYTES = 180000
