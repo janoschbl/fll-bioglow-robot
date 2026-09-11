@@ -101,7 +101,24 @@ class Telemetry:
         self.events = 0
         self.buffer_full = False
         self.active = True
+        self._send_metadata()
         self.tick(force=True)
+
+    def _metadata(self):
+        return struct.pack(
+            "<HHHHH",
+            config.TELEMETRY_SAMPLE_MS,
+            config.WHEEL_DIAMETER_MM,
+            config.AXLE_TRACK_MM,
+            struct.calcsize(SAMPLE_FORMAT),
+            struct.calcsize(EVENT_FORMAT),
+        ) + self.run_name.encode("utf-8")
+
+    def _send_metadata(self):
+        try:
+            self._send(self._packet(0, 0, self._metadata()))
+        except Exception as error:
+            print("TELEMETRY_LIVE_START_ERROR", str(error))
 
     def _append(self, record):
         if self.buffer_full or len(self.data) + len(record) > config.TELEMETRY_MAX_BYTES:
@@ -180,6 +197,11 @@ class Telemetry:
             )
             if self._append(record):
                 self.samples += 1
+                try:
+                    self._send(self._packet(3, self.samples, record))
+                except Exception as error:
+                    if self.samples == 1:
+                        print("TELEMETRY_LIVE_SAMPLE_ERROR", str(error))
         except Exception as error:
             self.dropped += 1
             if self.dropped == 1:
@@ -219,16 +241,7 @@ class Telemetry:
         self.tick(force=True)
         self.active = False
         sequence = 0
-        name = self.run_name.encode("utf-8")
-        meta = struct.pack(
-            "<HHHHH",
-            config.TELEMETRY_SAMPLE_MS,
-            config.WHEEL_DIAMETER_MM,
-            config.AXLE_TRACK_MM,
-            struct.calcsize(SAMPLE_FORMAT),
-            struct.calcsize(EVENT_FORMAT),
-        ) + name
-        self._send(self._packet(0, sequence, meta))
+        self._send(self._packet(0, sequence, self._metadata()))
         sequence += 1
         for offset in range(0, len(self.data), PACKET_PAYLOAD):
             self._send(self._packet(1, sequence, self.data[offset:offset + PACKET_PAYLOAD]))
