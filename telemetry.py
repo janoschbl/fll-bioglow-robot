@@ -112,7 +112,7 @@ class Telemetry:
             config.AXLE_TRACK_MM,
             struct.calcsize(SAMPLE_FORMAT),
             struct.calcsize(EVENT_FORMAT),
-        ) + self.run_name.encode("utf-8")
+        ) + bytes(self.run_name, "utf-8")
 
     def _send_metadata(self):
         try:

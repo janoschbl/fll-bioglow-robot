@@ -1,27 +1,14 @@
 from pybricks.hubs import PrimeHub
-from pybricks.parameters import Button
-from pybricks.pupdevices import ForceSensor, Motor
+from pybricks.pupdevices import Motor
 from pybricks.robotics import DriveBase
 
-import programs
 import robot_config as config
-from menu import Menu
-from robot import Robot
+from robot import MotionTimeout, ProgramAborted, Robot
 from telemetry import Telemetry
-
-
-def create_force_sensor():
-    try:
-        return ForceSensor(config.FORCE_SENSOR_PORT)
-    except OSError as error:
-        print("FORCE_SENSOR_UNAVAILABLE", str(error))
-        return None
 
 
 def main():
     hub = PrimeHub()
-    hub.system.set_stop_button(Button.BLUETOOTH)
-
     left_motor = Motor(config.LEFT_ATTACHMENT_PORT)
     right_motor = Motor(config.RIGHT_ATTACHMENT_PORT)
     left_drive_motor = Motor(
@@ -50,24 +37,37 @@ def main():
         right_drive_motor,
     )
     robot.reset_drivebase_settings()
-
-    force_sensor = create_force_sensor()
     telemetry = Telemetry(
         hub,
         drive_base,
         (left_motor, right_motor, left_drive_motor, right_drive_motor),
-        force_sensor,
+        None,
     )
     robot.set_telemetry(telemetry)
-    menu = Menu(hub, robot, force_sensor)
-    programs.load(menu.program, robot)
-
-    menu.register_motor_debug(left_motor, direction=1, index=1, name="Left Motor")
-    menu.register_motor_debug(right_motor, direction=1, index=2, name="Right Motor")
-    menu.register_motor_debug(left_drive_motor, direction=1, index=3, name="Left Drive")
-    menu.register_motor_debug(right_drive_motor, direction=1, index=4, name="Right Drive")
-
-    menu.run()
+    ergebnis = "success"
+    robot.begin_program("Live-Debugfahrt")
+    try:
+        print("DEBUG_START")
+        robot.wait(500)
+        robot.straight(150)
+        robot.wait(500)
+        robot.turn(45)
+        robot.wait(300)
+        robot.turn(-45)
+        robot.wait(500)
+        print("DEBUG_SUCCESS")
+    except ProgramAborted:
+        ergebnis = "aborted"
+        print("DEBUG_ABORTED")
+    except MotionTimeout as error:
+        ergebnis = "timeout"
+        print("DEBUG_TIMEOUT", str(error))
+    except Exception as error:
+        ergebnis = "error"
+        print("DEBUG_ERROR", str(error))
+    finally:
+        robot.emergency_stop()
+        robot.end_program(ergebnis)
 
 
 if __name__ == "__main__":
