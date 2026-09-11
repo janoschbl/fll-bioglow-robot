@@ -9,8 +9,8 @@ FORCE_SENSOR_PORT = Port.F
 LEFT_DRIVE_DIRECTION = Direction.COUNTERCLOCKWISE
 RIGHT_DRIVE_DIRECTION = Direction.CLOCKWISE
 
-WHEEL_DIAMETER_MM = 56
-AXLE_TRACK_MM = 112
+WHEEL_DIAMETER_MM = 62.4
+AXLE_TRACK_MM = 80
 
 # TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
 DEFAULT_STRAIGHT_SPEED = 450

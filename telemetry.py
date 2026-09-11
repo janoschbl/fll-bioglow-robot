@@ -108,8 +108,8 @@ class Telemetry:
         return struct.pack(
             "<HHHHH",
             config.TELEMETRY_SAMPLE_MS,
-            config.WHEEL_DIAMETER_MM,
-            config.AXLE_TRACK_MM,
+            int(round(config.WHEEL_DIAMETER_MM * 10)),
+            int(round(config.AXLE_TRACK_MM * 10)),
             struct.calcsize(SAMPLE_FORMAT),
             struct.calcsize(EVENT_FORMAT),
         ) + bytes(self.run_name, "utf-8")
