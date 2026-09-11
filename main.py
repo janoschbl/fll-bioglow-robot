@@ -49,11 +49,14 @@ def main():
     try:
         print("DEBUG_START")
         robot.wait(500)
-        robot.straight(150)
-        robot.wait(500)
-        robot.turn(45)
+        robot.straight(50)
         robot.wait(300)
-        robot.turn(-45)
+        robot.motor_angle(robot.left_motor, speed=200, angle=90)
+        robot.motor_angle(robot.right_motor, speed=200, angle=90)
+        robot.wait(300)
+        robot.turn(20)
+        robot.wait(300)
+        robot.turn(-20)
         robot.wait(500)
         print("DEBUG_SUCCESS")
     except ProgramAborted:
