@@ -37,7 +37,7 @@ STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3
 STALL_MIN_PROGRESS_RATIO = 0.10
 
-# Run-Telemetrie: 50 Hz live per AppData und zusätzlich vollständig im RAM
-# gepuffert. Reicht der Puffer nicht, wird der Verlust im Abschluss gemeldet.
+# Run-Telemetrie: während des gesamten Programms mit 50 Hz puffern und erst
+# nach Programmende als einen vollständigen Run übertragen.
 TELEMETRY_SAMPLE_MS = 20
 TELEMETRY_MAX_BYTES = 180000

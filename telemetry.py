@@ -101,7 +101,6 @@ class Telemetry:
         self.events = 0
         self.buffer_full = False
         self.active = True
-        self._send_metadata()
         self.tick(force=True)
 
     def _metadata(self):
@@ -113,12 +112,6 @@ class Telemetry:
             struct.calcsize(SAMPLE_FORMAT),
             struct.calcsize(EVENT_FORMAT),
         ) + bytes(self.run_name, "utf-8")
-
-    def _send_metadata(self):
-        try:
-            self._send(self._packet(0, 0, self._metadata()))
-        except Exception as error:
-            print("TELEMETRY_LIVE_START_ERROR", str(error))
 
     def _append(self, record):
         if self.buffer_full or len(self.data) + len(record) > config.TELEMETRY_MAX_BYTES:
@@ -197,11 +190,6 @@ class Telemetry:
             )
             if self._append(record):
                 self.samples += 1
-                try:
-                    self._send(self._packet(3, self.samples, record))
-                except Exception as error:
-                    if self.samples == 1:
-                        print("TELEMETRY_LIVE_SAMPLE_ERROR", str(error))
         except Exception as error:
             self.dropped += 1
             if self.dropped == 1:
