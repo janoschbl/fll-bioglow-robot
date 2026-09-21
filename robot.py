@@ -131,6 +131,14 @@ class Robot:
     def reset_drivebase_settings(self):
         self.drive_base.settings(*config.DEFAULT_DRIVEBASE_SETTINGS)
 
+        # Behalte die zur Hardware passende Geschwindigkeits-Toleranz von
+        # Pybricks bei, aber lasse einen Turn erst nahe am Zielwinkel enden.
+        speed_tolerance, _ = self.drive_base.heading_control.target_tolerances()
+        self.drive_base.heading_control.target_tolerances(
+            speed_tolerance,
+            config.TURN_TARGET_TOLERANCE_DEG,
+        )
+
     def set_gyro_use(self, value):
         self.drive_base.use_gyro(value)
         self._telemetry_event("gyro", 1, 1 if value else 0)
