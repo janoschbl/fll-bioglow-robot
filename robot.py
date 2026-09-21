@@ -135,6 +135,123 @@ class Robot:
         self.drive_base.use_gyro(value)
         self._telemetry_event("gyro", 1, 1 if value else 0)
 
+    def reset_heading(self, angle=0):
+        """Setzt nur die Fahrtrichtung neu, nicht die gefahrene Strecke."""
+        self.check_abort()
+        distance = self.drive_base.distance()
+        self.drive_base.reset(distance=distance, angle=angle)
+        self._telemetry_event("reset_heading", 1, angle)
+
+    def straight_task(self, distance, then=Stop.HOLD, timeout_ms=None):
+        """Beschreibt eine Geradeausfahrt für ``multitask``."""
+        return ("straight", distance, then, timeout_ms)
+
+    def motor_angle_task(
+        self,
+        motor,
+        speed,
+        angle,
+        then=Stop.HOLD,
+        timeout_ms=None,
+    ):
+        """Beschreibt eine Anbaubewegung für ``multitask``."""
+        return ("motor_angle", motor, speed, angle, then, timeout_ms)
+
+    def multitask(self, *tasks):
+        """Führt Geradeausfahrt und Anbaumotor-Bewegungen gleichzeitig aus."""
+        if not tasks:
+            raise ValueError("multitask needs at least one task")
+
+        active = []
+        drive_task_seen = False
+        attachment_motors = []
+
+        self.check_abort()
+
+        try:
+            for task in tasks:
+                if not isinstance(task, tuple) or not task:
+                    raise ValueError("invalid multitask task")
+
+                task_type = task[0]
+                timer = StopWatch()
+
+                if task_type == "straight":
+                    if len(task) != 4:
+                        raise ValueError("invalid straight task")
+                    if drive_task_seen:
+                        raise ValueError("multitask accepts only one drive task")
+
+                    distance, then, timeout_ms = task[1:]
+                    timeout_ms = (
+                        config.DRIVE_TIMEOUT_MS
+                        if timeout_ms is None
+                        else timeout_ms
+                    )
+                    self._telemetry_event("straight", 0, distance)
+                    self.stop_drive()
+                    self.drive_base.straight(distance, then=then, wait=False)
+                    active.append((
+                        self.drive_base.done,
+                        timer,
+                        timeout_ms,
+                        "straight",
+                        distance,
+                        self.stop_drive,
+                    ))
+                    drive_task_seen = True
+                elif task_type == "motor_angle":
+                    if len(task) != 6:
+                        raise ValueError("invalid motor_angle task")
+
+                    motor, speed, angle, then, timeout_ms = task[1:]
+                    if motor in attachment_motors:
+                        raise ValueError("a motor can only have one task")
+
+                    timeout_ms = (
+                        config.MOTOR_TIMEOUT_MS
+                        if timeout_ms is None
+                        else timeout_ms
+                    )
+                    self._telemetry_event("motor_angle", 0, speed, angle)
+                    motor.run_angle(speed, angle, then=then, wait=False)
+                    active.append((
+                        motor.done,
+                        timer,
+                        timeout_ms,
+                        "motor_angle",
+                        (speed, angle),
+                        lambda motor=motor: self.stop_attachment(motor),
+                    ))
+                    attachment_motors.append(motor)
+                else:
+                    raise ValueError("unsupported multitask task: " + str(task_type))
+
+            while active:
+                self.check_abort()
+                self._telemetry_tick()
+
+                for action in active[:]:
+                    done, timer, timeout_ms, name, values, stop = action
+
+                    if done():
+                        if name == "straight":
+                            self._telemetry_event(name, 1, values)
+                        else:
+                            self._telemetry_event(name, 1, values[0], values[1])
+                        active.remove(action)
+                    elif timer.time() >= timeout_ms:
+                        raise MotionTimeout(name + " timed out")
+
+                if active:
+                    wait(config.MOTION_POLL_MS)
+        except Exception:
+            for action in active:
+                action[5]()
+            raise
+
+        return True
+
     def _wait_until_done(self, done, timeout_ms, action_name):
         timer = StopWatch()
 

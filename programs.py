@@ -1,4 +1,12 @@
 def load(program, robot):
+    # Gleichzeitig fahren und einen Anbaumotor bewegen:
+    # robot.multitask(
+    #     robot.straight_task(500),
+    #     robot.motor_angle_task(robot.right_motor, 300, -90),
+    # )
+    # Die aktuelle Richtung kann jederzeit neu gesetzt werden:
+    # robot.reset_heading(0)
+
     @program(4, "DerErsteRun?!")
     def route_program():
         robot.set_gyro_use(True)
@@ -61,12 +69,3 @@ def load(program, robot):
         robot.straight(-500)
         robot.turn(30)
         robot.straight(-300)
-        
-        
-        
-        
-        
-        
-
-        
-    
