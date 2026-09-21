@@ -254,27 +254,15 @@ class Robot:
 
     def _wait_until_done(self, done, timeout_ms, action_name):
         timer = StopWatch()
-        consecutive_done = 0
 
-        # Der asynchrone Auftrag wird erst in einem folgenden Regelzyklus
-        # aktiv. Eine sofortige Abfrage kann noch das ``done`` des vorherigen
-        # Auftrags liefern und die Bewegung dadurch vorzeitig freigeben.
-        wait(config.MOTION_POLL_MS)
-
-        while consecutive_done < config.MOTION_DONE_CONFIRMATIONS:
+        while not done():
             self.check_abort()
             self._telemetry_tick()
-
-            if done():
-                consecutive_done += 1
-            else:
-                consecutive_done = 0
 
             if timer.time() >= timeout_ms:
                 raise MotionTimeout(action_name + " timed out")
 
-            if consecutive_done < config.MOTION_DONE_CONFIRMATIONS:
-                wait(config.MOTION_POLL_MS)
+            wait(config.MOTION_POLL_MS)
 
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
