@@ -19,8 +19,9 @@ def load(program, robot):
         robot.motor_angle(robot.right_motor, speed=300, angle=95)
         robot.set_drivebase_settings(straight_speed=800)
         robot.straight(-500)
-           
-    @program(2, "Mariia")
+
+    """
+    @program(5, "Mariia")
     def mariia():
         robot.set_gyro_use(True)
         robot.straight(600)
@@ -37,7 +38,8 @@ def load(program, robot):
         robot.straight(600)
         robot.turn(30)
         robot.straight(200)
-        
+    """
+    
     @program(3, "Drohnenfiech")
     def drohnenfiech():
         robot.set_gyro_use(True)
@@ -45,23 +47,51 @@ def load(program, robot):
         robot.turn(-70)
         robot.turn(70)
         robot.straight(-200)
-    
-    @program(1, "gamble")
+
+    @program(1, "setup")
+    def setupmotor():
+        robot.motor_target(robot.right_motor, 300, 45)
+        robot.motor_target(robot.left_motor, 300, 0)
+        robot.wait(2000)
+        
+    @program(2, "betterGamble")
+    def bettergamble():
+        robot.reset_drivebase_settings()
+        robot.set_drivebase_settings(450)
+        robot.set_gyro_use(True)
+        robot.straight(-50)
+        robot.reset_heading(0)
+        robot.straight(100)
+        robot.turn(20)
+        robot.straight(600)
+        robot.turn(110)
+        robot.motor_angle(robot.left_motor, 300, -115)
+        robot.straight(-320)
+        robot.motor_angle(robot.left_motor, 300, 115)
+        robot.straight(70)
+        robot.turn(-115)
+        robot.motor_angle(robot.right_motor, 300, -285)
+        robot.set_drivebase_settings(straight_speed=200)
+        robot.straight(75)
+        robot.motor_angle(robot.right_motor, 1000, -380)
+                        
+
+    """
+    @program(5, "gamble")
     def gamble():   
         robot.reset_drivebase_settings()
         robot.set_drivebase_settings(600)
         robot.set_gyro_use(True)
         robot.straight(-50)
+        robot.reset_heading(0)
         robot.turn(40)
         robot.straight(750)
         robot.turn(105)
         robot.motor_angle(robot.left_motor, 300, -110)
         robot.straight(-330)
         robot.motor_angle(robot.left_motor, 300, 110)
-        robot.straight(65)
-        robot.turn(-120)
-        robot.straight(-50)
-        robot.straight(30)
+        robot.straight(95)
+        robot.turn(-125)
         robot.motor_angle(robot.right_motor, 300, -140)
         robot.straight(130)
         robot.motor_angle(robot.right_motor, 1400, -390)
@@ -69,3 +99,4 @@ def load(program, robot):
         robot.straight(-500)
         robot.turn(30)
         robot.straight(-300)
+    """
