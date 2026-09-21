@@ -47,6 +47,7 @@ class FakeMotion:
         self.done_checks = 0
         self.started = None
         self.stopped = False
+        self.current_angle = 0
 
     def done(self):
         self.done_checks += 1
@@ -55,15 +56,32 @@ class FakeMotion:
     def stop(self):
         self.stopped = True
 
+    def angle(self):
+        return self.current_angle
+
 
 class FakeDriveBase(FakeMotion):
     def __init__(self, done_after=2):
         super().__init__(done_after)
         self.current_distance = 123
         self.reset_values = None
+        self.drive_settings = None
+        self.heading_control = FakeControl()
+
+    def settings(self, *values):
+        if values:
+            self.drive_settings = values
+        return self.drive_settings
 
     def straight(self, distance, then, wait):
         self.started = (distance, then, wait)
+
+    def turn(self, angle, then, wait, absolute=False):
+        self.started = (angle, then, wait, absolute)
+        if absolute:
+            self.current_angle = angle
+        else:
+            self.current_angle += angle
 
     def distance(self):
         return self.current_distance
@@ -85,6 +103,16 @@ class StaleDoneDriveBase(FakeDriveBase):
 class FakeMotor(FakeMotion):
     def run_angle(self, speed, angle, then, wait):
         self.started = (speed, angle, then, wait)
+
+
+class FakeControl:
+    def __init__(self):
+        self.tolerances = (10, 8)
+
+    def target_tolerances(self, *values):
+        if values:
+            self.tolerances = values
+        return self.tolerances
 
 
 def make_robot(drive_base=None, attachment=None):
@@ -130,7 +158,22 @@ class RobotTest(unittest.TestCase):
 
         robot.straight(600)
 
-        self.assertEqual(drive_base.done_checks, 5)
+        self.assertEqual(drive_base.done_checks, 4)
+
+    def test_turn_can_use_absolute_heading(self):
+        robot, drive_base, _ = make_robot()
+
+        robot.turn(85, precise=False, absolute=True)
+
+        self.assertEqual(drive_base.started, (85, "hold", False, True))
+        self.assertEqual(drive_base.angle(), 85)
+
+    def test_reset_settings_tightens_heading_position_tolerance(self):
+        robot, drive_base, _ = make_robot()
+
+        robot.reset_drivebase_settings()
+
+        self.assertEqual(drive_base.heading_control.tolerances, (10, 1))
 
     def test_multitask_stops_everything_on_timeout(self):
         drive_base = FakeDriveBase(done_after=1000)

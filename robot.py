@@ -85,17 +85,21 @@ class Robot:
             elapsed += part
         self._telemetry_event("wait", 1, milliseconds)
 
-    def stop_drive(self):
+    def stop_drive(self, include_motors=False):
         try:
             self.drive_base.stop()
         except Exception as error:
             print("STOP_ERROR drive_base", str(error))
 
-        for motor in self.drive_motors:
-            try:
-                motor.stop()
-            except Exception as error:
-                print("STOP_ERROR drive_motor", str(error))
+        # DriveBase owns its drive motors.  Sending a second stop command to
+        # the individual motors can race with the DriveBase controller.  Only
+        # use that fallback for the explicit emergency-stop path.
+        if include_motors:
+            for motor in self.drive_motors:
+                try:
+                    motor.stop()
+                except Exception as error:
+                    print("STOP_ERROR drive_motor", str(error))
 
     def stop_attachment(self, motor):
         try:
@@ -108,7 +112,7 @@ class Robot:
             self.stop_attachment(motor)
 
     def emergency_stop(self):
-        self.stop_drive()
+        self.stop_drive(include_motors=True)
         self.stop_attachments()
 
     def set_drivebase_settings(
@@ -130,9 +134,24 @@ class Robot:
 
     def reset_drivebase_settings(self):
         self.drive_base.settings(*config.DEFAULT_DRIVEBASE_SETTINGS)
+        self._configure_heading_tolerance()
+
+    def _configure_heading_tolerance(self):
+        try:
+            speed_tolerance, _ = self.drive_base.heading_control.target_tolerances()
+            self.drive_base.heading_control.target_tolerances(
+                speed_tolerance,
+                config.TURN_POSITION_TOLERANCE_DEG,
+            )
+        except (AttributeError, OSError, TypeError) as error:
+            # Older firmware has no public DriveBase control tolerances.  Keep
+            # the robot usable, but make the missing accuracy feature visible.
+            print("TURN_TOLERANCE_UNAVAILABLE", str(error))
 
     def set_gyro_use(self, value):
         self.drive_base.use_gyro(value)
+        if value:
+            self._configure_heading_tolerance()
         self._telemetry_event("gyro", 1, 1 if value else 0)
 
     def reset_heading(self, angle=0):
@@ -191,14 +210,21 @@ class Robot:
                     self._telemetry_event("straight", 0, distance)
                     self.stop_drive()
                     self.drive_base.straight(distance, then=then, wait=False)
-                    active.append((
-                        self.drive_base.done,
-                        timer,
-                        timeout_ms,
-                        "straight",
-                        distance,
-                        self.stop_drive,
-                    ))
+                    start_distance = self.drive_base.distance()
+                    active.append({
+                        "done": self.drive_base.done,
+                        "timer": timer,
+                        "timeout_ms": timeout_ms,
+                        "name": "straight",
+                        "values": distance,
+                        "stop": self.stop_drive,
+                        "progress": lambda start=start_distance: abs(
+                            self.drive_base.distance() - start
+                        ),
+                        "min_progress": config.MOTION_MIN_PROGRESS_MM,
+                        "armed": False,
+                        "saw_not_done": False,
+                    })
                     drive_task_seen = True
                 elif task_type == "motor_angle":
                     if len(task) != 6:
@@ -215,14 +241,21 @@ class Robot:
                     )
                     self._telemetry_event("motor_angle", 0, speed, angle)
                     motor.run_angle(speed, angle, then=then, wait=False)
-                    active.append((
-                        motor.done,
-                        timer,
-                        timeout_ms,
-                        "motor_angle",
-                        (speed, angle),
-                        lambda motor=motor: self.stop_attachment(motor),
-                    ))
+                    start_angle = motor.angle()
+                    active.append({
+                        "done": motor.done,
+                        "timer": timer,
+                        "timeout_ms": timeout_ms,
+                        "name": "motor_angle",
+                        "values": (speed, angle),
+                        "stop": lambda motor=motor: self.stop_attachment(motor),
+                        "progress": lambda motor=motor, start=start_angle: abs(
+                            motor.angle() - start
+                        ),
+                        "min_progress": config.MOTION_MIN_PROGRESS_DEG,
+                        "armed": False,
+                        "saw_not_done": False,
+                    })
                     attachment_motors.append(motor)
                 else:
                     raise ValueError("unsupported multitask task: " + str(task_type))
@@ -232,54 +265,95 @@ class Robot:
                 self._telemetry_tick()
 
                 for action in active[:]:
-                    done, timer, timeout_ms, name, values, stop = action
+                    done_state = action["done"]()
+                    if not done_state:
+                        action["saw_not_done"] = True
 
-                    if done():
+                    if not action["armed"]:
+                        if (
+                            action["progress"]() >= action["min_progress"]
+                            or (
+                                action["saw_not_done"]
+                                and action["timer"].time()
+                                >= config.MOTION_START_GUARD_MS
+                            )
+                        ):
+                            action["armed"] = True
+
+                    if action["armed"] and done_state:
+                        name = action["name"]
+                        values = action["values"]
                         if name == "straight":
                             self._telemetry_event(name, 1, values)
                         else:
                             self._telemetry_event(name, 1, values[0], values[1])
                         active.remove(action)
-                    elif timer.time() >= timeout_ms:
-                        raise MotionTimeout(name + " timed out")
+                    elif action["timer"].time() >= action["timeout_ms"]:
+                        raise MotionTimeout(action["name"] + " timed out")
 
                 if active:
                     wait(config.MOTION_POLL_MS)
         except Exception:
             for action in active:
-                action[5]()
+                action["stop"]()
             raise
 
         return True
 
-    def _wait_until_done(self, done, timeout_ms, action_name):
+    def _wait_until_done(
+        self,
+        done,
+        timeout_ms,
+        action_name,
+        progress=None,
+        min_progress=0,
+        completion=None,
+    ):
         timer = StopWatch()
-        consecutive_done = 0
+        armed = False
+        saw_not_done = False
 
-        # Der asynchrone Auftrag wird erst in einem folgenden Regelzyklus
-        # aktiv. Eine sofortige Abfrage kann noch das ``done`` des vorherigen
-        # Auftrags liefern und die Bewegung dadurch vorzeitig freigeben.
-        wait(config.MOTION_POLL_MS)
-
-        while consecutive_done < config.MOTION_DONE_CONFIRMATIONS:
+        # Do not debounce completion.  HOLD can legitimately make done()
+        # oscillate.  Instead, arm the newly started command first, after
+        # observable progress or after a short fence plus a fresh not-done
+        # observation.
+        while True:
             self.check_abort()
             self._telemetry_tick()
 
-            if done():
-                consecutive_done += 1
-            else:
-                consecutive_done = 0
+            done_state = done()
+            if not done_state:
+                saw_not_done = True
+
+            if not armed:
+                progress_reached = (
+                    progress is not None and progress() >= min_progress
+                )
+                if progress_reached or (
+                    timer.time() >= config.MOTION_START_GUARD_MS
+                    and (min_progress <= 0 or saw_not_done)
+                ):
+                    armed = True
+
+            if armed:
+                is_done = (
+                    completion(done_state)
+                    if completion is not None
+                    else done_state
+                )
+                if is_done:
+                    return
 
             if timer.time() >= timeout_ms:
                 raise MotionTimeout(action_name + " timed out")
 
-            if consecutive_done < config.MOTION_DONE_CONFIRMATIONS:
-                wait(config.MOTION_POLL_MS)
+            wait(config.MOTION_POLL_MS)
 
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
         self.stop_drive()
+        start_distance = self.drive_base.distance()
         self.drive_base.straight(distance, then=then, wait=False)
 
         try:
@@ -287,6 +361,8 @@ class Robot:
                 self.drive_base.done,
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms,
                 "straight",
+                progress=lambda: abs(self.drive_base.distance() - start_distance),
+                min_progress=config.MOTION_MIN_PROGRESS_MM,
             )
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
@@ -296,18 +372,68 @@ class Robot:
         self._telemetry_event("straight", 1, distance)
         return True
 
-    def turn(self, angle, then=Stop.HOLD, timeout_ms=None):
+    def _turn_once(self, angle, target_angle, then, timeout_ms, absolute):
+        self.stop_drive()
+
+        if absolute:
+            self.drive_base.turn(angle, then=then, wait=False, absolute=True)
+        else:
+            self.drive_base.turn(angle, then=then, wait=False)
+
+        start_angle = self.drive_base.angle()
+
+        def turn_complete(done_state):
+            return (
+                done_state
+                and abs(target_angle - self.drive_base.angle())
+                <= config.TURN_COMPLETION_TOLERANCE_DEG
+            )
+
+        self._wait_until_done(
+            self.drive_base.done,
+            timeout_ms,
+            "turn",
+            progress=lambda: abs(self.drive_base.angle() - start_angle),
+            min_progress=config.MOTION_MIN_PROGRESS_DEG,
+            completion=turn_complete,
+        )
+
+    def turn(
+        self,
+        angle,
+        then=Stop.HOLD,
+        timeout_ms=None,
+        absolute=False,
+        precise=True,
+    ):
         self.check_abort()
         self._telemetry_event("turn", 0, angle)
         self.stop_drive()
-        self.drive_base.turn(angle, then=then, wait=False)
+
+        start_angle = self.drive_base.angle()
+        target_angle = angle if absolute else start_angle + angle
 
         try:
-            self._wait_until_done(
-                self.drive_base.done,
-                config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms,
-                "turn",
+            turn_timeout = (
+                config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
+            self._turn_once(angle, target_angle, then, turn_timeout, absolute)
+
+            if precise:
+                for _ in range(config.TURN_MAX_CORRECTIONS):
+                    error = target_angle - self.drive_base.angle()
+                    if abs(error) < config.TURN_CORRECTION_THRESHOLD_DEG:
+                        break
+                    if absolute:
+                        self._turn_once(
+                            target_angle,
+                            target_angle,
+                            then,
+                            turn_timeout,
+                            True,
+                        )
+                    else:
+                        self._turn_once(error, target_angle, then, turn_timeout, False)
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
@@ -315,6 +441,16 @@ class Robot:
 
         self._telemetry_event("turn", 1, angle)
         return True
+
+    def turn_to(self, heading, then=Stop.HOLD, timeout_ms=None, precise=True):
+        """Turns to an absolute gyro heading when supported by the firmware."""
+        return self.turn(
+            heading,
+            then=then,
+            timeout_ms=timeout_ms,
+            absolute=True,
+            precise=precise,
+        )
 
     def arc(
         self,
@@ -332,6 +468,8 @@ class Robot:
         self.check_abort()
         self._telemetry_event("arc", 0, radius, angle if angle is not None else distance)
         self.stop_drive()
+        start_distance = self.drive_base.distance()
+        start_angle = self.drive_base.angle()
 
         if angle is not None:
             self.drive_base.arc(radius, angle=angle, then=then, wait=False)
@@ -343,6 +481,16 @@ class Robot:
                 self.drive_base.done,
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms,
                 "arc",
+                progress=(
+                    (lambda: abs(self.drive_base.angle() - start_angle))
+                    if angle is not None
+                    else (lambda: abs(self.drive_base.distance() - start_distance))
+                ),
+                min_progress=(
+                    config.MOTION_MIN_PROGRESS_DEG
+                    if angle is not None
+                    else config.MOTION_MIN_PROGRESS_MM
+                ),
             )
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
@@ -370,37 +518,69 @@ class Robot:
     def motor_angle(self, motor, speed, angle, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("motor_angle", 0, speed, angle)
+        start_angle = motor.angle()
         motor.run_angle(speed, angle, then=then, wait=False)
-        result = self._wait_for_motor(motor, "motor_angle", timeout_ms)
+        result = self._wait_for_motor(
+            motor,
+            "motor_angle",
+            timeout_ms,
+            start_angle,
+        )
         self._telemetry_event("motor_angle", 1, speed, angle)
         return result
 
     def motor_target(self, motor, speed, target, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("motor_target", 0, speed, target)
+        start_angle = motor.angle()
         motor.run_target(speed, target, then=then, wait=False)
-        result = self._wait_for_motor(motor, "motor_target", timeout_ms)
+        result = self._wait_for_motor(
+            motor,
+            "motor_target",
+            timeout_ms,
+            start_angle,
+        )
         self._telemetry_event("motor_target", 1, speed, target)
         return result
 
     def motor_time(self, motor, speed, time, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("motor_time", 0, speed, time)
+        start_angle = motor.angle()
         motor.run_time(speed, time, then=then, wait=False)
 
         if timeout_ms is None:
             timeout_ms = max(config.MOTOR_TIMEOUT_MS, time + 2000)
 
-        result = self._wait_for_motor(motor, "motor_time", timeout_ms)
+        result = self._wait_for_motor(
+            motor,
+            "motor_time",
+            timeout_ms,
+            start_angle,
+        )
         self._telemetry_event("motor_time", 1, speed, time)
         return result
 
-    def _wait_for_motor(self, motor, action_name, timeout_ms):
+    def _wait_for_motor(self, motor, action_name, timeout_ms, start_angle=None):
         if timeout_ms is None:
             timeout_ms = config.MOTOR_TIMEOUT_MS
 
         try:
-            self._wait_until_done(motor.done, timeout_ms, action_name)
+            self._wait_until_done(
+                motor.done,
+                timeout_ms,
+                action_name,
+                progress=(
+                    None
+                    if start_angle is None
+                    else lambda: abs(motor.angle() - start_angle)
+                ),
+                min_progress=(
+                    0
+                    if start_angle is None
+                    else config.MOTION_MIN_PROGRESS_DEG
+                ),
+            )
         except (ProgramAborted, MotionTimeout):
             self.stop_attachment(motor)
             raise

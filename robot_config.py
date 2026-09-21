@@ -28,9 +28,22 @@ DEFAULT_DRIVEBASE_SETTINGS = (
 
 # safety timeouts
 MOTION_POLL_MS = 10
-MOTION_DONE_CONFIRMATIONS = 2
+# A newly queued asynchronous command needs at least one control-cycle before
+# ``done()`` can be trusted.  This is deliberately a short launch fence, not
+# a multi-sample completion debounce: HOLD can make ``done()`` oscillate.
+MOTION_START_GUARD_MS = 30
+MOTION_MIN_PROGRESS_DEG = 0.5
+MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
+
+# Heading completion.  Pybricks uses the second value as the position
+# tolerance.  One degree leaves enough margin for the physical robot while
+# avoiding the several-degree default completion window.
+TURN_POSITION_TOLERANCE_DEG = 1
+TURN_COMPLETION_TOLERANCE_DEG = 1.25
+TURN_CORRECTION_THRESHOLD_DEG = 1.0
+TURN_MAX_CORRECTIONS = 1
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000

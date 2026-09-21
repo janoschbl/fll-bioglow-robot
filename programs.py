@@ -1,3 +1,6 @@
+from calibration import run as run_calibration
+
+
 def load(program, robot):
     # Gleichzeitig fahren und einen Anbaumotor bewegen:
     # robot.multitask(
@@ -74,6 +77,10 @@ def load(program, robot):
         robot.set_drivebase_settings(straight_speed=200)
         robot.straight(75)
         robot.motor_angle(robot.right_motor, 1000, -380)
+
+    @program(5, "Turn calibration")
+    def turn_calibration():
+        run_calibration(robot)
                         
 
     """
