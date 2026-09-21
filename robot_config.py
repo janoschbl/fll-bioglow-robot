@@ -18,11 +18,6 @@ DEFAULT_STRAIGHT_ACCELERATION = 700
 DEFAULT_TURN_RATE = 150
 DEFAULT_TURN_ACCELERATION = 300
 
-# Pybricks betrachtet eine Drehung bereits innerhalb seiner standardmaessigen
-# Ziel-Toleranz als abgeschlossen. Diese kann mehrere Grad betragen, sodass die
-# Heading-Regelung den Rest erst waehrend der naechsten Geradeausfahrt korrigiert.
-TURN_TARGET_TOLERANCE_DEG = 1
-
 DEFAULT_DRIVEBASE_SETTINGS = (
     DEFAULT_STRAIGHT_SPEED,
     DEFAULT_STRAIGHT_ACCELERATION,

@@ -56,28 +56,11 @@ class FakeMotion:
         self.stopped = True
 
 
-class FakeControl:
-    def __init__(self):
-        self.tolerances = (12, 8)
-
-    def target_tolerances(self, *values):
-        if values:
-            self.tolerances = values
-        return self.tolerances
-
-
 class FakeDriveBase(FakeMotion):
     def __init__(self, done_after=2):
         super().__init__(done_after)
         self.current_distance = 123
         self.reset_values = None
-        self.drive_settings = None
-        self.heading_control = FakeControl()
-
-    def settings(self, *values):
-        if values:
-            self.drive_settings = values
-        return self.drive_settings
 
     def straight(self, distance, then, wait):
         self.started = (distance, then, wait)
@@ -118,13 +101,6 @@ class RobotTest(unittest.TestCase):
         robot.reset_heading(42)
 
         self.assertEqual(drive_base.reset_values, (123, 42))
-
-    def test_reset_settings_tightens_only_heading_position_tolerance(self):
-        robot, drive_base, _ = make_robot()
-
-        robot.reset_drivebase_settings()
-
-        self.assertEqual(drive_base.heading_control.tolerances, (12, 1))
 
     def test_multitask_runs_straight_and_motor_together(self):
         robot, drive_base, motor = make_robot()
