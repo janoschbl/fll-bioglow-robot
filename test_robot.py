@@ -72,6 +72,16 @@ class FakeDriveBase(FakeMotion):
         self.reset_values = (distance, angle)
 
 
+class StaleDoneDriveBase(FakeDriveBase):
+    def __init__(self):
+        super().__init__()
+        self.done_values = [True, False, False, True, True]
+
+    def done(self):
+        self.done_checks += 1
+        return self.done_values.pop(0)
+
+
 class FakeMotor(FakeMotion):
     def run_angle(self, speed, angle, then, wait):
         self.started = (speed, angle, then, wait)
@@ -113,6 +123,14 @@ class RobotTest(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(drive_base.started, (500, "hold", False))
         self.assertEqual(motor.started, (300, -90, "hold", False))
+
+    def test_straight_ignores_stale_done_from_previous_command(self):
+        drive_base = StaleDoneDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.straight(600)
+
+        self.assertEqual(drive_base.done_checks, 5)
 
     def test_multitask_stops_everything_on_timeout(self):
         drive_base = FakeDriveBase(done_after=1000)
