@@ -1,5 +1,5 @@
 def load(program, robot):
-    @program(1, "DerErsteRun?!")
+    @program(4, "DerErsteRun?!")
     def route_program():
         robot.set_gyro_use(True)
         robot.straight(410)
@@ -37,6 +37,33 @@ def load(program, robot):
         robot.turn(-70)
         robot.turn(70)
         robot.straight(-200)
+    
+    @program(1, "gamble")
+    def gamble():   
+        robot.reset_drivebase_settings()
+        robot.set_drivebase_settings(600)
+        robot.set_gyro_use(True)
+        robot.straight(-50)
+        robot.turn(40)
+        robot.straight(750)
+        robot.turn(105)
+        robot.motor_angle(robot.left_motor, 300, -110)
+        robot.straight(-330)
+        robot.motor_angle(robot.left_motor, 300, 110)
+        robot.straight(65)
+        robot.turn(-120)
+        robot.straight(-50)
+        robot.straight(30)
+        robot.motor_angle(robot.right_motor, 300, -140)
+        robot.straight(130)
+        robot.motor_angle(robot.right_motor, 1400, -390)
+        robot.set_drivebase_settings(straight_speed=1000)
+        robot.straight(-500)
+        robot.turn(30)
+        robot.straight(-300)
+        
+        
+        
         
         
         
