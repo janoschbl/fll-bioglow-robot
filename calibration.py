@@ -34,6 +34,7 @@ WIEDERHOLUNGEN = 3
 
 REGEL_INTERVALL_MS = 5
 FERTIG_STABIL_MS = 50
+BREMSZEIT_MS = 120
 MIN_FORTSCHRITT_DEG = 0.5
 ZIEL_TOLERANZ_DEG = 1
 MAX_DAUER_MS = 1500
@@ -111,9 +112,12 @@ def schnelle_drehung(
     fahrziel = ziel + zugabe if ziel >= 0 else ziel - zugabe
     _fahr_drehung(hub, drive_base, fahrziel, gesamt_uhr)
 
-    drive_base.stop()
+    # Stop.BRAKE muss die Bewegung erst wirklich abbauen. Ein sofortiges
+    # drive_base.stop() wuerde die aktive Bremse aufheben und unterdrehen.
+    wait(BREMSZEIT_MS)
     dauer = gesamt_uhr.time()
     endwinkel = drive_base.angle()
+    drive_base.stop()
     drive_base.settings(*einstellungen)
     return dauer, endwinkel, fahrziel
 
