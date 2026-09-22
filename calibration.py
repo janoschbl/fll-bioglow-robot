@@ -26,14 +26,14 @@ TEST_WINKEL = (33, -33, 47, -47)
 # Genauigkeit. Jetzt wird die mechanisch unterschiedliche Unterdrehung nach
 # rechts und links direkt im schnellen Fahrbefehl ausgeglichen.
 TEST_PROFILE = (
+    (100, 300, 0.0, 0.0),
     (100, 300, 1.5, 3.0),
     (100, 300, 2.5, 3.5),
-    (100, 300, 3.5, 4.5),
 )
 WIEDERHOLUNGEN = 3
 
 REGEL_INTERVALL_MS = 5
-STARTSCHUTZ_MS = 30
+FERTIG_STABIL_MS = 50
 MIN_FORTSCHRITT_DEG = 0.5
 ZIEL_TOLERANZ_DEG = 1
 MAX_DAUER_MS = 1500
@@ -54,6 +54,7 @@ def _antrieb_bremsen(drive_base, linker_motor, rechter_motor):
 def _warte_fahrbefehl(hub, drive_base, startwinkel, gesamt_uhr):
     """Wartet auf den ersten echten Abschluss und ignoriert altes ``done``."""
     gestartet = False
+    fertig_seit = None
 
     while True:
         _abbruch_pruefen(hub)
@@ -64,7 +65,12 @@ def _warte_fahrbefehl(hub, drive_base, startwinkel, gesamt_uhr):
         if fortschritt >= MIN_FORTSCHRITT_DEG or not fertig:
             gestartet = True
         if gestartet and fertig:
-            return
+            if fertig_seit is None:
+                fertig_seit = jetzt
+            elif jetzt - fertig_seit >= FERTIG_STABIL_MS:
+                return
+        else:
+            fertig_seit = None
         if jetzt >= MAX_DAUER_MS:
             drive_base.stop()
             raise RuntimeError(
@@ -73,9 +79,6 @@ def _warte_fahrbefehl(hub, drive_base, startwinkel, gesamt_uhr):
                     drive_base.angle(),
                 )
             )
-        # Sehr kurze Bewegungen koennen schon beim ersten Poll fertig sein.
-        if jetzt >= STARTSCHUTZ_MS and fertig and fortschritt > 0:
-            return
         wait(REGEL_INTERVALL_MS)
 
 
