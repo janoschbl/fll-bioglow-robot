@@ -29,6 +29,7 @@ sys.modules["pybricks"] = types.ModuleType("pybricks")
 sys.modules["pybricks.parameters"] = parameters
 sys.modules["pybricks.tools"] = tools
 
+import robot_config as config
 from robot import MotionTimeout, Robot
 
 
@@ -229,6 +230,28 @@ class RobotTest(unittest.TestCase):
         robot.turn(180)
 
         self.assertGreaterEqual(FakeStopWatch.now, 2000)
+
+    def test_precise_180_turn_finishes_at_stable_gyro_target(self):
+        class StuckDoneAtTargetDriveBase(FakeDriveBase):
+            def done(self):
+                self.done_checks += 1
+                return False
+
+            def turn(self, angle, then, wait, absolute=False):
+                self.started = (angle, then, wait, absolute)
+                # Die Vorsteuerung befiehlt 186 Grad, der reale Roboter steht
+                # nach dem Abbremsen aber exakt am gewuenschten 180-Grad-Ziel.
+                self.current_angle += angle - config.TURN_COMPENSATION_DEG
+
+        drive_base = StuckDoneAtTargetDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(180)
+
+        self.assertEqual(drive_base.started, (186, "brake", False, False))
+        self.assertEqual(drive_base.angle(), 180)
+        self.assertTrue(drive_base.stopped)
+        self.assertLess(FakeStopWatch.now, 1000)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()
