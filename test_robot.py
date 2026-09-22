@@ -176,6 +176,33 @@ class RobotTest(unittest.TestCase):
         self.assertEqual(drive_base.done_checks, 4)
         self.assertEqual(drive_base.reset_values, (123, 0))
 
+    def test_straight_brakes_at_measured_distance_without_done(self):
+        class CrossingDriveBase(FakeDriveBase):
+            def __init__(self):
+                super().__init__(done_after=1000)
+                self.command_target = self.current_distance
+                self.drive_settings = (450, 700, 100, 300)
+
+            def straight(self, distance, then, wait):
+                self.started = (distance, then, wait)
+                self.command_target = self.current_distance + distance
+
+            def done(self):
+                self.done_checks += 1
+                self.current_distance = min(
+                    self.command_target,
+                    self.current_distance + 5,
+                )
+                return False
+
+        drive_base = CrossingDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.straight(100)
+
+        self.assertLessEqual(abs(drive_base.distance() - 223), 15)
+        self.assertTrue(drive_base.stopped)
+
     def test_turn_can_use_absolute_heading(self):
         robot, drive_base, _ = make_robot()
 

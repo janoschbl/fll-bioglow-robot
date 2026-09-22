@@ -372,21 +372,126 @@ class Robot:
         # Winkelwerte bleiben dabei numerisch unveraendert.
         self._reset_drive_control()
         start_distance = self.drive_base.distance()
+        target_distance = start_distance + distance
+        direction = 1 if distance >= 0 else -1
+        timeout_ms = config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
+        try:
+            straight_speed = abs(self.drive_base.settings()[0])
+        except (AttributeError, OSError, TypeError):
+            straight_speed = config.DEFAULT_STRAIGHT_SPEED
+        brake_lead = max(
+            config.STRAIGHT_MIN_BRAKE_LEAD_MM,
+            straight_speed * config.STRAIGHT_BRAKE_REACTION_MS / 1000,
+        )
         self.drive_base.straight(distance, then=then, wait=False)
 
+        timer = StopWatch()
+        next_log = 0
+        armed = False
+        saw_not_done = False
+
+        print(
+            "STRAIGHT_START",
+            "start", start_distance,
+            "target", target_distance,
+            "distance", distance,
+            "speed", straight_speed,
+            "brake_lead", brake_lead,
+            "timeout_ms", timeout_ms,
+        )
+
         try:
-            self._wait_until_done(
-                self.drive_base.done,
-                config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms,
-                "straight",
-                progress=lambda: abs(self.drive_base.distance() - start_distance),
-                min_progress=config.MOTION_MIN_PROGRESS_MM,
-            )
+            while True:
+                self.check_abort()
+                self._telemetry_tick()
+
+                elapsed = timer.time()
+                current_distance = self.drive_base.distance()
+                error = target_distance - current_distance
+                remaining = error * direction
+                progress = abs(current_distance - start_distance)
+                done_state = self.drive_base.done()
+
+                if not done_state:
+                    saw_not_done = True
+                if not armed and (
+                    progress >= config.MOTION_MIN_PROGRESS_MM
+                    or (
+                        elapsed >= config.MOTION_START_GUARD_MS
+                        and saw_not_done
+                    )
+                ):
+                    armed = True
+                    print("STRAIGHT_ARMED", "ms", elapsed, "progress", progress)
+
+                if elapsed >= next_log:
+                    print(
+                        "STRAIGHT_STATUS",
+                        "ms", elapsed,
+                        "distance", current_distance,
+                        "target", target_distance,
+                        "error", error,
+                        "done", done_state,
+                        "armed", armed,
+                    )
+                    next_log = elapsed + config.TURN_LOG_INTERVAL_MS
+
+                if armed and remaining <= brake_lead:
+                    print(
+                        "STRAIGHT_TARGET_REACHED",
+                        "ms", elapsed,
+                        "distance", current_distance,
+                        "error", error,
+                        "remaining", remaining,
+                        "brake_lead", brake_lead,
+                    )
+                    self.brake_drive()
+                    self.wait(config.STRAIGHT_BRAKE_SETTLE_MS)
+                    final_distance = self.drive_base.distance()
+                    final_error = target_distance - final_distance
+                    print(
+                        "STRAIGHT_DONE",
+                        "ms", timer.time(),
+                        "distance", final_distance,
+                        "error", final_error,
+                        "source", "measured_distance_brake",
+                    )
+                    if abs(final_error) > config.STRAIGHT_COMPLETION_TOLERANCE_MM:
+                        print("STRAIGHT_ACCURACY_WARNING", target_distance, final_error)
+                    break
+
+                if armed and done_state:
+                    print(
+                        "STRAIGHT_DONE",
+                        "ms", elapsed,
+                        "distance", current_distance,
+                        "error", error,
+                        "source", "pybricks",
+                    )
+                    break
+
+                if elapsed >= timeout_ms:
+                    print(
+                        "STRAIGHT_TIMEOUT",
+                        "ms", elapsed,
+                        "distance", current_distance,
+                        "target", target_distance,
+                        "error", error,
+                        "done", done_state,
+                    )
+                    raise MotionTimeout("straight timed out")
+
+                wait(config.MOTION_POLL_MS)
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("straight", 2, distance)
             raise
 
+        print(
+            "STRAIGHT_FINISH",
+            "target", target_distance,
+            "distance", self.drive_base.distance(),
+        )
         self._telemetry_event("straight", 1, distance)
         return True
 
