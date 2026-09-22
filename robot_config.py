@@ -37,13 +37,18 @@ MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
 
-# Heading completion. Pybricks selbst bleibt auf griffigen Reifen gelegentlich
-# 3 bis 4 Grad vor seinem internen Korrekturziel stehen. Dieser Restfehler ist
-# fuer die Missionen akzeptabel und darf keine zweite, blockierende
-# Kleinstbewegung ausloesen.
+# Heading completion. Kleine Restfehler werden nicht mit einem weiteren
+# DriveBase.turn() korrigiert: Dessen Positionsprofil ueberwindet auf griffigen
+# Reifen die Haftreibung oft nicht. Stattdessen regelt Robot den Gyro-Winkel
+# aktiv mit einer ausreichend hohen Mindestdrehrate nach.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_CORRECTION_THRESHOLD_DEG = 4
-TURN_COMPLETION_TOLERANCE_DEG = 4
+TURN_CORRECTION_THRESHOLD_DEG = 1
+TURN_COMPLETION_TOLERANCE_DEG = 1
+TURN_CORRECTION_TIMEOUT_MS = 4000
+TURN_CORRECTION_SETTLE_MS = 120
+TURN_CORRECTION_MIN_RATE = 18
+TURN_CORRECTION_MAX_RATE = 60
+TURN_CORRECTION_GAIN = 4
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
 # 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
