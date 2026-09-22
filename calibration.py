@@ -22,18 +22,20 @@ LINKS_RICHTUNG = Direction.COUNTERCLOCKWISE
 RECHTS_RICHTUNG = Direction.CLOCKWISE
 
 TEST_WINKEL = (33, -33, 47, -47)
-# Die Soll-Drehrate bleibt bewusst bei 100 Grad/s. Untersucht wird, welche
-# Beschleunigung schnell anfaehrt, ohne die Genauigkeit zu verschlechtern.
-TEST_PROFILE = ((100, 300), (100, 600), (100, 900))
+# Die erste Messreihe zeigte bei 100 Grad/s und 300 Grad/s2 die beste
+# Genauigkeit. Jetzt wird die mechanisch unterschiedliche Unterdrehung nach
+# rechts und links direkt im schnellen Fahrbefehl ausgeglichen.
+TEST_PROFILE = (
+    (100, 300, 1.5, 3.0),
+    (100, 300, 2.5, 3.5),
+    (100, 300, 3.5, 4.5),
+)
 WIEDERHOLUNGEN = 3
 
 REGEL_INTERVALL_MS = 5
 STARTSCHUTZ_MS = 30
 MIN_FORTSCHRITT_DEG = 0.5
 ZIEL_TOLERANZ_DEG = 1
-KORREKTUR_GRENZE_DEG = 1.25
-KORREKTUR_RATE = 60
-KORREKTUR_BESCHLEUNIGUNG = 900
 MAX_DAUER_MS = 1500
 MESS_PAUSE_MS = 150
 
@@ -83,8 +85,16 @@ def _fahr_drehung(hub, drive_base, ziel, gesamt_uhr):
     _warte_fahrbefehl(hub, drive_base, startwinkel, gesamt_uhr)
 
 
-def schnelle_drehung(hub, drive_base, ziel, rate, beschleunigung):
-    """Dreht absolut und gibt Laufzeit, Endwinkel und Korrekturzahl zurueck."""
+def schnelle_drehung(
+    hub,
+    drive_base,
+    ziel,
+    rate,
+    beschleunigung,
+    zugabe_rechts,
+    zugabe_links,
+):
+    """Dreht mit richtungsabhaengiger Vorsteuerung auf den Zielwinkel."""
     einstellungen = drive_base.settings()
     drive_base.settings(
         einstellungen[0],
@@ -94,24 +104,15 @@ def schnelle_drehung(hub, drive_base, ziel, rate, beschleunigung):
     )
 
     gesamt_uhr = StopWatch()
-    _fahr_drehung(hub, drive_base, ziel, gesamt_uhr)
-    korrekturen = 0
-
-    if abs(ziel - drive_base.angle()) > KORREKTUR_GRENZE_DEG:
-        drive_base.settings(
-            einstellungen[0],
-            einstellungen[1],
-            KORREKTUR_RATE,
-            KORREKTUR_BESCHLEUNIGUNG,
-        )
-        _fahr_drehung(hub, drive_base, ziel, gesamt_uhr)
-        korrekturen = 1
+    zugabe = zugabe_rechts if ziel >= 0 else zugabe_links
+    fahrziel = ziel + zugabe if ziel >= 0 else ziel - zugabe
+    _fahr_drehung(hub, drive_base, fahrziel, gesamt_uhr)
 
     drive_base.stop()
     dauer = gesamt_uhr.time()
     endwinkel = drive_base.angle()
     drive_base.settings(*einstellungen)
-    return dauer, endwinkel, korrekturen
+    return dauer, endwinkel, fahrziel
 
 
 def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
@@ -127,18 +128,19 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
 
     print("CAL_BEGIN")
     print(
-        "CAL_FIELDS,rate,beschleunigung,wiederholung,ziel_deg,"
-        "endwinkel_deg,fehler_deg,dauer_ms,korrekturen,bestanden"
+        "CAL_FIELDS,rate,beschleunigung,zugabe_rechts,zugabe_links,"
+        "wiederholung,ziel_deg,fahrziel_deg,endwinkel_deg,fehler_deg,"
+        "dauer_ms,bestanden"
     )
 
     gesamt_bestanden = 0
     gesamt = 0
     statistik = {}
 
-    for rate, beschleunigung in TEST_PROFILE:
-        schluessel = (rate, beschleunigung)
-        # bestanden, gesamt, dauer_summe, max_fehler, max_dauer, korrekturen
-        statistik[schluessel] = [0, 0, 0, 0, 0, 0]
+    for rate, beschleunigung, zugabe_rechts, zugabe_links in TEST_PROFILE:
+        schluessel = (rate, beschleunigung, zugabe_rechts, zugabe_links)
+        # bestanden, gesamt, dauer_summe, max_fehler, max_dauer
+        statistik[schluessel] = [0, 0, 0, 0, 0]
 
         for wiederholung in range(1, WIEDERHOLUNGEN + 1):
             for ziel in TEST_WINKEL:
@@ -147,13 +149,19 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
                 wait(MESS_PAUSE_MS)
 
                 try:
-                    dauer, endwinkel, korrekturen = schnelle_drehung(
-                        hub, drive_base, ziel, rate, beschleunigung
+                    dauer, endwinkel, fahrziel = schnelle_drehung(
+                        hub,
+                        drive_base,
+                        ziel,
+                        rate,
+                        beschleunigung,
+                        zugabe_rechts,
+                        zugabe_links,
                     )
                 except RuntimeError as error:
                     dauer = MAX_DAUER_MS
                     endwinkel = drive_base.angle()
-                    korrekturen = -1
+                    fahrziel = ziel
                     print("CAL_TIMEOUT", str(error))
 
                 fehler = ziel - endwinkel
@@ -167,18 +175,20 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
                 profil[2] += dauer
                 profil[3] = max(profil[3], abs(fehler))
                 profil[4] = max(profil[4], dauer)
-                profil[5] += max(0, korrekturen)
 
                 print(
-                    "CAL_RESULT,{},{},{},{},{:.3f},{:.3f},{},{},{}".format(
+                    "CAL_RESULT,{},{},{:.1f},{:.1f},{},{},{:.3f},{:.3f},"
+                    "{:.3f},{},{}".format(
                         rate,
                         beschleunigung,
+                        zugabe_rechts,
+                        zugabe_links,
                         wiederholung,
                         ziel,
+                        fahrziel,
                         endwinkel,
                         fehler,
                         dauer,
-                        korrekturen,
                         1 if ist_bestanden else 0,
                     )
                 )
@@ -186,25 +196,31 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
 
     bestes_profil = None
     beste_dauer = None
-    for rate, beschleunigung in TEST_PROFILE:
-        profil = statistik[(rate, beschleunigung)]
+    for rate, beschleunigung, zugabe_rechts, zugabe_links in TEST_PROFILE:
+        profil = statistik[(rate, beschleunigung, zugabe_rechts, zugabe_links)]
         mittlere_dauer = profil[2] / profil[1]
         print(
-            "CAL_PROFILE,{},{},{},{},{:.1f},{:.3f},{},{}".format(
+            "CAL_PROFILE,{},{},{:.1f},{:.1f},{},{},{:.1f},{:.3f},{}".format(
                 rate,
                 beschleunigung,
+                zugabe_rechts,
+                zugabe_links,
                 profil[0],
                 profil[1],
                 mittlere_dauer,
                 profil[3],
                 profil[4],
-                profil[5],
             )
         )
         if profil[0] == profil[1] and (
             beste_dauer is None or mittlere_dauer < beste_dauer
         ):
-            bestes_profil = (rate, beschleunigung)
+            bestes_profil = (
+                rate,
+                beschleunigung,
+                zugabe_rechts,
+                zugabe_links,
+            )
             beste_dauer = mittlere_dauer
 
     _antrieb_bremsen(drive_base, linker_motor, rechter_motor)
