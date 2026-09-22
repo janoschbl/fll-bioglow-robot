@@ -26,9 +26,9 @@ TEST_WINKEL = (33, -33, 47, -47)
 # Genauigkeit. Jetzt wird die mechanisch unterschiedliche Unterdrehung nach
 # rechts und links direkt im schnellen Fahrbefehl ausgeglichen.
 TEST_PROFILE = (
-    (100, 300, 0.0, 0.0),
-    (100, 300, 1.5, 3.0),
-    (100, 300, 2.5, 3.5),
+    (100, 300, 6.0, 6.0),
+    (100, 300, 7.0, 7.0),
+    (100, 300, 8.0, 8.0),
 )
 WIEDERHOLUNGEN = 3
 
