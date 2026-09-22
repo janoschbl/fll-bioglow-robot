@@ -205,7 +205,7 @@ class RobotTest(unittest.TestCase):
             def turn(self, angle, then, wait, absolute=False):
                 self.turn_calls.append(angle)
                 if len(self.turn_calls) == 1:
-                    self.current_angle += angle - 9
+                    self.current_angle += angle - 11
                 else:
                     self.current_angle += angle
 
@@ -214,8 +214,28 @@ class RobotTest(unittest.TestCase):
 
         robot.turn(85)
 
-        self.assertEqual(drive_base.turn_calls, [91, 3])
+        self.assertEqual(drive_base.turn_calls, [91, 5])
         self.assertEqual(drive_base.angle(), 85)
+
+    def test_turn_accepts_four_degree_tire_tolerance_without_correction(self):
+        class TireLimitedDriveBase(FakeDriveBase):
+            def __init__(self):
+                super().__init__()
+                self.turn_calls = []
+
+            def turn(self, angle, then, wait, absolute=False):
+                self.turn_calls.append(angle)
+                # Entspricht dem gemessenen Lauf: 186 Grad befohlen, wegen
+                # Reifenhaftung bei 183,5 Grad stehen geblieben.
+                self.current_angle += angle - 2.5
+
+        drive_base = TireLimitedDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(180)
+
+        self.assertEqual(drive_base.turn_calls, [186])
+        self.assertEqual(drive_base.angle(), 183.5)
 
     def test_large_turn_waits_until_drivebase_reports_done(self):
         class SlowLargeTurnDriveBase(FakeDriveBase):

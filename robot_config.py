@@ -37,12 +37,13 @@ MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
 
-# Heading completion.  Pybricks uses the second value as the position
-# tolerance.  One degree leaves enough margin for the physical robot while
-# avoiding the several-degree default completion window.
+# Heading completion. Pybricks selbst bleibt auf griffigen Reifen gelegentlich
+# 3 bis 4 Grad vor seinem internen Korrekturziel stehen. Dieser Restfehler ist
+# fuer die Missionen akzeptabel und darf keine zweite, blockierende
+# Kleinstbewegung ausloesen.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_CORRECTION_THRESHOLD_DEG = 2
-TURN_COMPLETION_TOLERANCE_DEG = 2
+TURN_CORRECTION_THRESHOLD_DEG = 4
+TURN_COMPLETION_TOLERANCE_DEG = 4
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
 # 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
