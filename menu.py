@@ -205,7 +205,6 @@ class Menu:
 
         if force_pressed:
             try:
-                # Begrenzte Kennlinie: Pybricks unterstützt keine Long-Integer.
                 force = max(0, min(10, self.force_sensor.force()))
                 speed = 100 + int(force * force * 9)
             except Exception as error:
@@ -242,7 +241,6 @@ class Menu:
             print("PROGRAM_TIMEOUT", entry["name"], str(error))
         except Exception as error:
             outcome = "error"
-            # menü bleibt nach program error aktiv
             print("PROGRAM_ERROR", entry["name"], str(error))
         finally:
             self.robot.emergency_stop()
