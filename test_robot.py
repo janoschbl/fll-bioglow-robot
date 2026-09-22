@@ -204,18 +204,21 @@ class RobotTest(unittest.TestCase):
 
             def turn(self, angle, then, wait, absolute=False):
                 self.turn_calls.append(angle)
-                self.current_angle += angle - 11
+                if len(self.turn_calls) == 1:
+                    self.current_angle += angle - 11
+                else:
+                    self.current_angle += angle - 6
 
         drive_base = CorrectableDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
         robot.turn(85)
 
-        self.assertEqual(drive_base.turn_calls, [91])
+        self.assertEqual(drive_base.turn_calls, [91, 11])
         self.assertLessEqual(abs(drive_base.angle() - 85), 1)
         self.assertTrue(drive_base.stopped)
 
-    def test_turn_corrects_four_degree_tire_error_without_second_turn(self):
+    def test_turn_corrects_four_degree_tire_error_with_compensation(self):
         class TireLimitedDriveBase(FakeDriveBase):
             def __init__(self):
                 super().__init__()
@@ -223,20 +226,21 @@ class RobotTest(unittest.TestCase):
 
             def turn(self, angle, then, wait, absolute=False):
                 self.turn_calls.append(angle)
-                # Entspricht dem gemessenen Lauf: 186 Grad befohlen, wegen
-                # Reifenhaftung bei 183,5 Grad stehen geblieben.
-                self.current_angle += angle - 2.5
+                if len(self.turn_calls) == 1:
+                    self.current_angle += angle + 0.5
+                else:
+                    self.current_angle += angle + 6
 
         drive_base = TireLimitedDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
         robot.turn(180)
 
-        self.assertEqual(drive_base.turn_calls, [186])
+        self.assertEqual(drive_base.turn_calls, [183, -9.5])
         self.assertLessEqual(abs(drive_base.angle() - 180), 1)
         self.assertTrue(drive_base.stopped)
 
-    def test_large_turn_waits_until_drivebase_reports_done(self):
+    def test_large_turn_finishes_at_measured_target_before_done(self):
         class SlowLargeTurnDriveBase(FakeDriveBase):
             def done(self):
                 self.done_checks += 1
@@ -246,9 +250,10 @@ class RobotTest(unittest.TestCase):
         drive_base.drive_settings = (450, 700, 100, 300)
         robot, _, _ = make_robot(drive_base=drive_base)
 
-        robot.turn(180)
+        robot.turn(180, precise=False)
 
-        self.assertGreaterEqual(FakeStopWatch.now, 2000)
+        self.assertEqual(FakeStopWatch.now, config.TURN_TARGET_SETTLE_MS)
+        self.assertLess(FakeStopWatch.now, 2000)
 
     def test_precise_180_turn_finishes_at_stable_gyro_target(self):
         class StuckDoneAtTargetDriveBase(FakeDriveBase):
@@ -258,16 +263,16 @@ class RobotTest(unittest.TestCase):
 
             def turn(self, angle, then, wait, absolute=False):
                 self.started = (angle, then, wait, absolute)
-                # Die Vorsteuerung befiehlt 186 Grad, der reale Roboter steht
-                # nach dem Abbremsen aber exakt am gewuenschten 180-Grad-Ziel.
-                self.current_angle += angle - config.TURN_COMPENSATION_DEG
+                # Die Vorsteuerung befiehlt 183 Grad, der reale Roboter steht
+                # nach dem Abbremsen exakt am gewuenschten 180-Grad-Ziel.
+                self.current_angle += angle - config.TURN_LARGE_COMPENSATION_DEG
 
         drive_base = StuckDoneAtTargetDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
         robot.turn(180)
 
-        self.assertEqual(drive_base.started, (186, "brake", False, False))
+        self.assertEqual(drive_base.started, (183, "brake", False, False))
         self.assertEqual(drive_base.angle(), 180)
         self.assertTrue(drive_base.stopped)
         self.assertLess(FakeStopWatch.now, 1000)
