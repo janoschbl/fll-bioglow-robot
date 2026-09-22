@@ -42,12 +42,12 @@ MOTOR_TIMEOUT_MS = 10000
 # avoiding the several-degree default completion window.
 TURN_POSITION_TOLERANCE_DEG = 1
 TURN_CORRECTION_THRESHOLD_DEG = 2
+TURN_COMPLETION_TOLERANCE_DEG = 2
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
 # 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
 # sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
 TURN_COMPENSATION_DEG = 6
-TURN_DONE_STABLE_MS = 50
 TURN_BRAKE_SETTLE_MS = 120
 
 # stall fallback über encoder fortschritt
