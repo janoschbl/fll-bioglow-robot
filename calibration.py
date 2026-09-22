@@ -25,12 +25,8 @@ TEST_WINKEL = (33, -33, 47, -47)
 # Die erste Messreihe zeigte bei 100 Grad/s und 300 Grad/s2 die beste
 # Genauigkeit. Jetzt wird die mechanisch unterschiedliche Unterdrehung nach
 # rechts und links direkt im schnellen Fahrbefehl ausgeglichen.
-TEST_PROFILE = (
-    (100, 300, 6.0, 6.0),
-    (100, 300, 7.0, 7.0),
-    (100, 300, 8.0, 8.0),
-)
-WIEDERHOLUNGEN = 3
+TEST_PROFILE = ((100, 300, 6.0, 6.0),)
+WIEDERHOLUNGEN = 5
 
 REGEL_INTERVALL_MS = 5
 FERTIG_STABIL_MS = 50

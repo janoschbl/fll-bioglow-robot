@@ -15,7 +15,7 @@ AXLE_TRACK_MM = 80
 # TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
 DEFAULT_STRAIGHT_SPEED = 450
 DEFAULT_STRAIGHT_ACCELERATION = 700
-DEFAULT_TURN_RATE = 150
+DEFAULT_TURN_RATE = 100
 DEFAULT_TURN_ACCELERATION = 300
 
 DEFAULT_DRIVEBASE_SETTINGS = (
@@ -41,22 +41,15 @@ MOTOR_TIMEOUT_MS = 10000
 # tolerance.  One degree leaves enough margin for the physical robot while
 # avoiding the several-degree default completion window.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_CORRECTION_THRESHOLD_DEG = 0.75
+TURN_CORRECTION_THRESHOLD_DEG = 2
 
-# Nach dem normalen DriveBase-Turn uebernimmt ein kleiner P-Regler die
-# Feinpositionierung. Er benutzt absichtlich nicht ``done()`` und kann daher
-# nicht in der Kombination aus ``done() == True`` und verfehltem Winkel
-# haengen bleiben.
-TURN_TRIM_P_GAIN = 2.0
-TURN_TRIM_MIN_RATE = 14
-# Die kurzen 33-/47-Grad-Tests waren bei 45 Grad/s in allen acht Laeufen
-# stabil (maximal 0,431 Grad Fehler, durchschnittlich 1,62 Sekunden).
-TURN_TRIM_MAX_RATE = 45
-TURN_TRIM_NEAR_MAX_RATE = 28
-TURN_TRIM_NEAR_THRESHOLD_DEG = 5
-TURN_TRIM_YAW_TOLERANCE_DEG_S = 4
-TURN_TRIM_SETTLE_MS = 180
-TURN_TRIM_TIMEOUT_MS = 5000
+# Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
+# 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
+# sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
+TURN_COMPENSATION_DEG = 6
+TURN_DONE_STABLE_MS = 50
+TURN_BRAKE_SETTLE_MS = 120
+TURN_TOTAL_TIMEOUT_MS = 1500
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000

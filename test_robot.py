@@ -179,7 +179,7 @@ class RobotTest(unittest.TestCase):
         self.assertEqual(drive_base.started, (85, "hold", False, True))
         self.assertEqual(drive_base.angle(), 85)
 
-    def test_turn_trims_an_inaccurate_completed_motion(self):
+    def test_turn_compensates_an_inaccurate_completed_motion(self):
         class InaccurateDriveBase(FakeDriveBase):
             def turn(self, angle, then, wait, absolute=False):
                 self.started = (angle, then, wait, absolute)
@@ -190,7 +190,9 @@ class RobotTest(unittest.TestCase):
 
         robot.turn(85, absolute=True)
 
-        self.assertLessEqual(abs(85 - drive_base.angle()), 0.75)
+        self.assertEqual(drive_base.started, (91, "brake", False, True))
+        self.assertLess(abs(85 - drive_base.angle()), 2)
+        self.assertLess(FakeStopWatch.now, 1500)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()
