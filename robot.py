@@ -1,3 +1,5 @@
+from math import sqrt
+
 from pybricks.parameters import Button, Stop
 from pybricks.tools import StopWatch, wait
 
@@ -417,6 +419,37 @@ class Robot:
 
             wait(config.MOTION_POLL_MS)
 
+    def _turn_timeout_for_angle(self, angle):
+        """Berechnet ein realistisches Zeitlimit aus dem Drehprofil."""
+        settings = self.drive_base.settings()
+        if settings:
+            turn_rate = abs(settings[2])
+            turn_acceleration = abs(settings[3])
+        else:
+            turn_rate = config.DEFAULT_TURN_RATE
+            turn_acceleration = config.DEFAULT_TURN_ACCELERATION
+
+        turn_rate = max(turn_rate, 1)
+        turn_acceleration = max(turn_acceleration, 1)
+        distance = abs(angle)
+        ramp_distance = turn_rate * turn_rate / turn_acceleration
+
+        if distance <= ramp_distance:
+            motion_seconds = 2 * sqrt(distance / turn_acceleration)
+        else:
+            motion_seconds = (
+                2 * turn_rate / turn_acceleration
+                + (distance - ramp_distance) / turn_rate
+            )
+
+        estimated_ms = int(motion_seconds * 1000)
+        return max(
+            config.TURN_MIN_TOTAL_TIMEOUT_MS,
+            estimated_ms
+            + config.TURN_TIMEOUT_MARGIN_MS
+            + config.TURN_BRAKE_SETTLE_MS,
+        )
+
     def turn(
         self,
         angle,
@@ -433,9 +466,10 @@ class Robot:
         target_angle = angle if absolute else start_angle + angle
 
         try:
-            turn_timeout = (
+            requested_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
+            turn_timeout = requested_timeout
             total_timer = StopWatch()
             # Der reale Antrieb verliert beim Abbremsen etwa sechs Grad. Die
             # Vorsteuerung erledigt das in derselben schnellen Bewegung.
@@ -453,10 +487,13 @@ class Robot:
                     if absolute
                     else angle + compensation
                 )
+                total_timeout = min(
+                    requested_timeout,
+                    self._turn_timeout_for_angle(commanded_angle),
+                )
                 turn_timeout = min(
-                    turn_timeout,
-                    config.TURN_TOTAL_TIMEOUT_MS
-                    - config.TURN_BRAKE_SETTLE_MS,
+                    requested_timeout,
+                    total_timeout - config.TURN_BRAKE_SETTLE_MS,
                 )
             else:
                 commanded_angle = angle
@@ -472,8 +509,8 @@ class Robot:
                 # Stop.BRAKE aktiv lassen. stop_drive() an dieser Stelle
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
-                if total_timer.time() >= config.TURN_TOTAL_TIMEOUT_MS:
-                    raise MotionTimeout("turn exceeded 1500 ms")
+                if total_timer.time() >= total_timeout:
+                    raise MotionTimeout("turn exceeded calculated timeout")
                 error = target_angle - self.drive_base.angle()
                 if abs(error) >= config.TURN_CORRECTION_THRESHOLD_DEG:
                     print("TURN_ACCURACY_WARNING", target_angle, error)

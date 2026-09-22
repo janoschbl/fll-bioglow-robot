@@ -49,7 +49,10 @@ TURN_CORRECTION_THRESHOLD_DEG = 2
 TURN_COMPENSATION_DEG = 6
 TURN_DONE_STABLE_MS = 50
 TURN_BRAKE_SETTLE_MS = 120
-TURN_TOTAL_TIMEOUT_MS = 1500
+# Kurze Drehungen bleiben auf das vermessene 1,5-s-Ziel begrenzt. Fuer grosse
+# Winkel wird das Limit aus Drehrate und Beschleunigung berechnet.
+TURN_MIN_TOTAL_TIMEOUT_MS = 1500
+TURN_TIMEOUT_MARGIN_MS = 500
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000
