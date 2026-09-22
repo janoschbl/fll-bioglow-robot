@@ -561,16 +561,6 @@ class Robot:
                 )
                 next_log = elapsed + config.TURN_LOG_INTERVAL_MS
 
-            if armed and done_state:
-                print(
-                    "TURN_DONE",
-                    "ms", elapsed,
-                    "angle", current_angle,
-                    "error", error,
-                    "source", "pybricks",
-                )
-                return
-
             in_target = armed and remaining <= config.TURN_BRAKE_LEAD_DEG
             if in_target:
                 print(
@@ -589,7 +579,17 @@ class Robot:
                     "error", target_angle - self.drive_base.angle(),
                     "source", "measured_angle_brake",
                 )
-                return
+                return "measured_angle"
+
+            if armed and done_state:
+                print(
+                    "TURN_SEGMENT_DONE",
+                    "ms", elapsed,
+                    "angle", current_angle,
+                    "error", error,
+                    "source", "pybricks",
+                )
+                return "pybricks"
 
             if elapsed >= timeout_ms:
                 print(
@@ -665,21 +665,55 @@ class Robot:
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
                 error = target_angle - self.drive_base.angle()
+                for attempt in range(config.TURN_CORRECTION_ATTEMPTS):
+                    if abs(error) <= config.TURN_COMPLETION_TOLERANCE_DEG:
+                        break
+                    compensation = (
+                        config.TURN_COMPENSATION_DEG
+                        if error > 0
+                        else -config.TURN_COMPENSATION_DEG
+                    )
+                    correction = error + compensation
+                    print(
+                        "TURN_CORRECTION_START",
+                        "attempt", attempt + 1,
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                        "command", correction,
+                    )
+                    self._turn_once(
+                        correction,
+                        Stop.BRAKE,
+                        config.TURN_CORRECTION_TIMEOUT_MS,
+                        False,
+                        target_angle,
+                    )
+                    self.wait(config.TURN_BRAKE_SETTLE_MS)
+                    error = target_angle - self.drive_base.angle()
+                    print(
+                        "TURN_CORRECTION_RESULT",
+                        "attempt", attempt + 1,
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                    )
 
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
                     print(
-                        "TURN_ACCURACY_WARNING",
+                        "TURN_TARGET_TIMEOUT",
                         "target", target_angle,
                         "angle", self.drive_base.angle(),
                         "error", error,
                     )
-                else:
-                    print(
-                        "TURN_ACCURACY_OK",
-                        "target", target_angle,
-                        "angle", self.drive_base.angle(),
-                        "error", error,
-                    )
+                    raise MotionTimeout("turn target not reached")
+
+                print(
+                    "TURN_ACCURACY_OK",
+                    "target", target_angle,
+                    "angle", self.drive_base.angle(),
+                    "error", error,
+                )
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
