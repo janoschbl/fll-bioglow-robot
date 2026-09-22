@@ -5,10 +5,9 @@ from robot import MotionTimeout, ProgramAborted
 
 
 PROGRAM_POSITIONS = [
-    (0, 0),
-    (1, 0),
-    (2, 0),
-    (3, 0),
+    (x, y)
+    for y in range(3)
+    for x in range(5)
 ]
 
 DEBUG_POSITIONS = [
