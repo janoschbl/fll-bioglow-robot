@@ -15,7 +15,7 @@ AXLE_TRACK_MM = 80
 # TODO drivebase defaults aus benchmark, ggf noch ändern basierend auf kommenden Benchmarks mit neuem Roboter!
 DEFAULT_STRAIGHT_SPEED = 450
 DEFAULT_STRAIGHT_ACCELERATION = 700
-DEFAULT_TURN_RATE = 150
+DEFAULT_TURN_RATE = 100
 DEFAULT_TURN_ACCELERATION = 300
 
 DEFAULT_DRIVEBASE_SETTINGS = (
@@ -28,8 +28,28 @@ DEFAULT_DRIVEBASE_SETTINGS = (
 
 # safety timeouts
 MOTION_POLL_MS = 10
+# A newly queued asynchronous command needs at least one control-cycle before
+# ``done()`` can be trusted.  This is deliberately a short launch fence, not
+# a multi-sample completion debounce: HOLD can make ``done()`` oscillate.
+MOTION_START_GUARD_MS = 30
+MOTION_MIN_PROGRESS_DEG = 0.5
+MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
+
+# Heading completion.  Pybricks uses the second value as the position
+# tolerance.  One degree leaves enough margin for the physical robot while
+# avoiding the several-degree default completion window.
+TURN_POSITION_TOLERANCE_DEG = 1
+TURN_CORRECTION_THRESHOLD_DEG = 2
+
+# Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
+# 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
+# sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
+TURN_COMPENSATION_DEG = 6
+TURN_DONE_STABLE_MS = 50
+TURN_BRAKE_SETTLE_MS = 120
+TURN_TOTAL_TIMEOUT_MS = 1500
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000

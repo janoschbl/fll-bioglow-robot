@@ -41,12 +41,21 @@ class FakeHub:
     buttons = FakeButtons()
 
 
+class FakeImu:
+    def angular_velocity(self):
+        return (0, 0, 0)
+
+
+FakeHub.imu = FakeImu()
+
+
 class FakeMotion:
     def __init__(self, done_after=2):
         self.done_after = done_after
         self.done_checks = 0
         self.started = None
         self.stopped = False
+        self.current_angle = 0
 
     def done(self):
         self.done_checks += 1
@@ -55,15 +64,35 @@ class FakeMotion:
     def stop(self):
         self.stopped = True
 
+    def angle(self):
+        return self.current_angle
+
 
 class FakeDriveBase(FakeMotion):
     def __init__(self, done_after=2):
         super().__init__(done_after)
         self.current_distance = 123
         self.reset_values = None
+        self.drive_settings = None
+        self.heading_control = FakeControl()
+
+    def settings(self, *values):
+        if values:
+            self.drive_settings = values
+        return self.drive_settings
 
     def straight(self, distance, then, wait):
         self.started = (distance, then, wait)
+
+    def turn(self, angle, then, wait, absolute=False):
+        self.started = (angle, then, wait, absolute)
+        if absolute:
+            self.current_angle = angle
+        else:
+            self.current_angle += angle
+
+    def drive(self, speed, turn_rate):
+        self.current_angle += turn_rate * 0.01
 
     def distance(self):
         return self.current_distance
@@ -72,9 +101,29 @@ class FakeDriveBase(FakeMotion):
         self.reset_values = (distance, angle)
 
 
+class StaleDoneDriveBase(FakeDriveBase):
+    def __init__(self):
+        super().__init__()
+        self.done_values = [True, False, False, True, True]
+
+    def done(self):
+        self.done_checks += 1
+        return self.done_values.pop(0)
+
+
 class FakeMotor(FakeMotion):
     def run_angle(self, speed, angle, then, wait):
         self.started = (speed, angle, then, wait)
+
+
+class FakeControl:
+    def __init__(self):
+        self.tolerances = (10, 8)
+
+    def target_tolerances(self, *values):
+        if values:
+            self.tolerances = values
+        return self.tolerances
 
 
 def make_robot(drive_base=None, attachment=None):
@@ -113,6 +162,44 @@ class RobotTest(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(drive_base.started, (500, "hold", False))
         self.assertEqual(motor.started, (300, -90, "hold", False))
+
+    def test_straight_ignores_stale_done_from_previous_command(self):
+        drive_base = StaleDoneDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.straight(600)
+
+        self.assertEqual(drive_base.done_checks, 4)
+
+    def test_turn_can_use_absolute_heading(self):
+        robot, drive_base, _ = make_robot()
+
+        robot.turn(85, precise=False, absolute=True)
+
+        self.assertEqual(drive_base.started, (85, "hold", False, True))
+        self.assertEqual(drive_base.angle(), 85)
+
+    def test_turn_compensates_an_inaccurate_completed_motion(self):
+        class InaccurateDriveBase(FakeDriveBase):
+            def turn(self, angle, then, wait, absolute=False):
+                self.started = (angle, then, wait, absolute)
+                self.current_angle = angle - 5
+
+        drive_base = InaccurateDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(85, absolute=True)
+
+        self.assertEqual(drive_base.started, (91, "brake", False, True))
+        self.assertLess(abs(85 - drive_base.angle()), 2)
+        self.assertLess(FakeStopWatch.now, 1500)
+
+    def test_reset_settings_tightens_heading_position_tolerance(self):
+        robot, drive_base, _ = make_robot()
+
+        robot.reset_drivebase_settings()
+
+        self.assertEqual(drive_base.heading_control.tolerances, (10, 1))
 
     def test_multitask_stops_everything_on_timeout(self):
         drive_base = FakeDriveBase(done_after=1000)
