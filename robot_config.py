@@ -37,6 +37,13 @@ MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
 
+# Geradeausfahrt: Reaktions- und Bremsweg werden aus der eingestellten
+# Geschwindigkeit angenaehert. Bei 450 mm/s sind 20 ms rund neun Millimeter.
+STRAIGHT_BRAKE_REACTION_MS = 20
+STRAIGHT_MIN_BRAKE_LEAD_MM = 3
+STRAIGHT_BRAKE_SETTLE_MS = 50
+STRAIGHT_COMPLETION_TOLERANCE_MM = 15
+
 # Heading completion. Die schnelle Drehung wird beim ersten Erreichen des
 # echten Gyro-Ziels aktiv gebremst; es gibt keine zweite Korrekturbewegung.
 TURN_POSITION_TOLERANCE_DEG = 1
