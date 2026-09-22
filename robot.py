@@ -387,7 +387,7 @@ class Robot:
         then,
         timeout_ms,
         absolute,
-        target_angle=None,
+        target_angle,
     ):
         self.stop_drive()
         start_angle = self.drive_base.angle()
@@ -397,52 +397,114 @@ class Robot:
         else:
             self.drive_base.turn(angle, then=then, wait=False)
 
-        target_timer = StopWatch()
+        timer = StopWatch()
         target_since = None
-        target_fallback_used = [False]
+        next_log = 0
+        armed = False
+        saw_not_done = False
 
-        def completed(done_state):
-            nonlocal target_since
-
-            if done_state:
-                return True
-            if target_angle is None:
-                return False
-
-            angular_velocity = self.hub.imu.angular_velocity()
-            turn_rate = max(abs(value) for value in angular_velocity)
-            target_reached = (
-                abs(target_angle - self.drive_base.angle())
-                <= config.TURN_COMPLETION_TOLERANCE_DEG
-                and turn_rate <= config.TURN_TARGET_MAX_RATE_DEG_S
-            )
-            if not target_reached:
-                target_since = None
-                return False
-
-            now = target_timer.time()
-            if target_since is None:
-                target_since = now
-                return False
-            if now - target_since < config.TURN_TARGET_SETTLE_MS:
-                return False
-
-            target_fallback_used[0] = True
-            return True
-
-        # Ein einziges frisches done() beendet den Durchlauf. Falls Pybricks
-        # bei erreichtem 180-Grad-Gyro-Ziel done() nicht setzt, beendet auch
-        # ein stabil erreichter echter Zielwinkel die Bewegung.
-        self._wait_until_done(
-            self.drive_base.done,
-            timeout_ms,
-            "turn",
-            progress=lambda: abs(self.drive_base.angle() - start_angle),
-            min_progress=config.MOTION_MIN_PROGRESS_DEG,
-            completion=completed,
+        print(
+            "TURN_START",
+            "start", start_angle,
+            "target", target_angle,
+            "command", angle,
+            "absolute", absolute,
+            "timeout_ms", timeout_ms,
         )
-        if target_fallback_used[0]:
-            self.stop_drive()
+
+        while True:
+            self.check_abort()
+            self._telemetry_tick()
+
+            elapsed = timer.time()
+            current_angle = self.drive_base.angle()
+            error = target_angle - current_angle
+            done_state = self.drive_base.done()
+            progress = abs(current_angle - start_angle)
+
+            if not done_state:
+                saw_not_done = True
+            if not armed and (
+                progress >= config.MOTION_MIN_PROGRESS_DEG
+                or (
+                    elapsed >= config.MOTION_START_GUARD_MS
+                    and saw_not_done
+                )
+            ):
+                armed = True
+                print("TURN_ARMED", "ms", elapsed, "progress", progress)
+
+            if elapsed >= next_log:
+                print(
+                    "TURN_STATUS",
+                    "ms", elapsed,
+                    "angle", current_angle,
+                    "target", target_angle,
+                    "error", error,
+                    "done", done_state,
+                    "armed", armed,
+                )
+                next_log = elapsed + config.TURN_LOG_INTERVAL_MS
+
+            if armed and done_state:
+                print(
+                    "TURN_DONE",
+                    "ms", elapsed,
+                    "angle", current_angle,
+                    "error", error,
+                    "source", "pybricks",
+                )
+                return
+
+            in_target = (
+                armed
+                and abs(error) <= config.TURN_COMPLETION_TOLERANCE_DEG
+            )
+            if in_target:
+                if target_since is None:
+                    target_since = elapsed
+                    print(
+                        "TURN_TARGET_ENTER",
+                        "ms", elapsed,
+                        "angle", current_angle,
+                        "error", error,
+                    )
+                elif elapsed - target_since >= config.TURN_TARGET_SETTLE_MS:
+                    # Der echte Gyro-Winkel ist stabil am Ziel. Pybricks kann
+                    # bei 180 Grad trotzdem done() == False liefern. Deshalb
+                    # beenden wir den Regler selbst und fahren im Programm fort.
+                    self.stop_drive()
+                    print(
+                        "TURN_DONE",
+                        "ms", elapsed,
+                        "angle", current_angle,
+                        "error", error,
+                        "source", "measured_angle",
+                        "stable_ms", elapsed - target_since,
+                    )
+                    return
+            elif target_since is not None:
+                print(
+                    "TURN_TARGET_LEFT",
+                    "ms", elapsed,
+                    "angle", current_angle,
+                    "error", error,
+                )
+                target_since = None
+
+            if elapsed >= timeout_ms:
+                print(
+                    "TURN_TIMEOUT",
+                    "ms", elapsed,
+                    "angle", current_angle,
+                    "target", target_angle,
+                    "error", error,
+                    "done", done_state,
+                    "progress", progress,
+                )
+                raise MotionTimeout("turn timed out")
+
+            wait(config.MOTION_POLL_MS)
 
     def turn(
         self,
@@ -458,6 +520,15 @@ class Robot:
 
         start_angle = self.drive_base.angle()
         target_angle = angle if absolute else start_angle + angle
+
+        print(
+            "TURN_REQUEST",
+            "angle", angle,
+            "start", start_angle,
+            "target", target_angle,
+            "absolute", absolute,
+            "precise", precise,
+        )
 
         try:
             turn_timeout = (
@@ -510,11 +581,22 @@ class Robot:
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
                     print("TURN_ACCURACY_ERROR", target_angle, error)
                     raise MotionTimeout("turn did not reach target angle")
+                print(
+                    "TURN_ACCURACY_OK",
+                    "target", target_angle,
+                    "angle", self.drive_base.angle(),
+                    "error", error,
+                )
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
             raise
 
+        print(
+            "TURN_FINISH",
+            "target", target_angle,
+            "angle", self.drive_base.angle(),
+        )
         self._telemetry_event("turn", 1, angle)
         return True
 

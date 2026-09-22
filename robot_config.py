@@ -54,7 +54,7 @@ TURN_BRAKE_SETTLE_MS = 120
 # Zielwinkel fuer diese Dauer praktisch still erreicht, gilt die Drehung
 # trotzdem als beendet.
 TURN_TARGET_SETTLE_MS = 120
-TURN_TARGET_MAX_RATE_DEG_S = 3
+TURN_LOG_INTERVAL_MS = 250
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000
