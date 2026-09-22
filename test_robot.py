@@ -75,7 +75,6 @@ class FakeDriveBase(FakeMotion):
         self.reset_values = None
         self.drive_settings = None
         self.heading_control = FakeControl()
-        self.turn_rates = [0]
 
     def settings(self, *values):
         if values:
@@ -97,14 +96,6 @@ class FakeDriveBase(FakeMotion):
 
     def distance(self):
         return self.current_distance
-
-    def state(self):
-        turn_rate = (
-            self.turn_rates.pop(0)
-            if len(self.turn_rates) > 1
-            else self.turn_rates[0]
-        )
-        return (self.current_distance, 0, self.current_angle, turn_rate)
 
     def reset(self, distance, angle):
         self.reset_values = (distance, angle)
@@ -179,6 +170,7 @@ class RobotTest(unittest.TestCase):
         robot.straight(600)
 
         self.assertEqual(drive_base.done_checks, 4)
+        self.assertEqual(drive_base.reset_values, (123, 0))
 
     def test_turn_can_use_absolute_heading(self):
         robot, drive_base, _ = make_robot()
@@ -202,25 +194,6 @@ class RobotTest(unittest.TestCase):
         self.assertEqual(drive_base.started, (91, "brake", False, True))
         self.assertLess(abs(85 - drive_base.angle()), 2)
         self.assertLess(FakeStopWatch.now, 1500)
-
-    def test_precise_turn_waits_for_heading_to_settle(self):
-        drive_base = FakeDriveBase()
-        drive_base.turn_rates = [12, 8, 2, 2, 2, 2, 2, 2, 2, 2]
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        robot.turn(45)
-
-        self.assertGreaterEqual(FakeStopWatch.now, 120)
-
-    def test_precise_turn_times_out_if_heading_keeps_moving(self):
-        drive_base = FakeDriveBase()
-        drive_base.turn_rates = [12]
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        with self.assertRaises(MotionTimeout):
-            robot.turn(45)
-
-        self.assertTrue(drive_base.stopped)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()

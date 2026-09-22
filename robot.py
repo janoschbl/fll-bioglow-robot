@@ -161,6 +161,12 @@ class Robot:
         self.drive_base.reset(distance=distance, angle=angle)
         self._telemetry_event("reset_heading", 1, angle)
 
+    def _reset_drive_control(self):
+        """Verwirft alte Fahrziele, ohne Weg oder Richtung zu veraendern."""
+        distance = self.drive_base.distance()
+        angle = self.drive_base.angle()
+        self.drive_base.reset(distance=distance, angle=angle)
+
     def straight_task(self, distance, then=Stop.HOLD, timeout_ms=None):
         """Beschreibt eine Geradeausfahrt für ``multitask``."""
         return ("straight", distance, then, timeout_ms)
@@ -208,7 +214,7 @@ class Robot:
                         else timeout_ms
                     )
                     self._telemetry_event("straight", 0, distance)
-                    self.stop_drive()
+                    self._reset_drive_control()
                     self.drive_base.straight(distance, then=then, wait=False)
                     start_distance = self.drive_base.distance()
                     active.append({
@@ -352,7 +358,10 @@ class Robot:
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
-        self.stop_drive()
+        # reset() beendet den vorherigen Regler und setzt den aktuellen
+        # Gyro-Winkel sofort als neue Nullabweichung fuer diese Gerade. Weg und
+        # Winkelwerte bleiben dabei numerisch unveraendert.
+        self._reset_drive_control()
         start_distance = self.drive_base.distance()
         self.drive_base.straight(distance, then=then, wait=False)
 
@@ -408,30 +417,6 @@ class Robot:
 
             wait(config.MOTION_POLL_MS)
 
-    def _wait_until_heading_settled(self, timeout_ms):
-        """Wartet, bis die Gyro-Drehrate dauerhaft nahe null liegt."""
-        timer = StopWatch()
-        settled_since = None
-
-        while True:
-            self.check_abort()
-            self._telemetry_tick()
-
-            now = timer.time()
-            turn_rate = self.drive_base.state()[3]
-            if abs(turn_rate) <= config.TURN_SETTLE_RATE_DEG_S:
-                if settled_since is None:
-                    settled_since = now
-                elif now - settled_since >= config.TURN_SETTLE_STABLE_MS:
-                    return
-            else:
-                settled_since = None
-
-            if now >= timeout_ms:
-                raise MotionTimeout("turn did not settle")
-
-            wait(config.MOTION_POLL_MS)
-
     def turn(
         self,
         angle,
@@ -471,7 +456,7 @@ class Robot:
                 turn_timeout = min(
                     turn_timeout,
                     config.TURN_TOTAL_TIMEOUT_MS
-                    - config.TURN_SETTLE_TIMEOUT_MS,
+                    - config.TURN_BRAKE_SETTLE_MS,
                 )
             else:
                 commanded_angle = angle
@@ -486,17 +471,7 @@ class Robot:
             if precise:
                 # Stop.BRAKE aktiv lassen. stop_drive() an dieser Stelle
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
-                # Eine feste Pause reicht nicht: Je nach Untergrund und Akku
-                # dreht der Aufbau unterschiedlich lange nach. Erst eine
-                # dauerhaft kleine Gyro-Drehrate ergibt eine saubere Referenz
-                # fuer den folgenden straight()-Befehl.
-                remaining_timeout = max(
-                    config.MOTION_POLL_MS,
-                    config.TURN_TOTAL_TIMEOUT_MS - total_timer.time(),
-                )
-                self._wait_until_heading_settled(
-                    min(config.TURN_SETTLE_TIMEOUT_MS, remaining_timeout)
-                )
+                self.wait(config.TURN_BRAKE_SETTLE_MS)
                 if total_timer.time() >= config.TURN_TOTAL_TIMEOUT_MS:
                     raise MotionTimeout("turn exceeded 1500 ms")
                 error = target_angle - self.drive_base.angle()
