@@ -381,7 +381,14 @@ class Robot:
         self._telemetry_event("straight", 1, distance)
         return True
 
-    def _turn_once(self, angle, then, timeout_ms, absolute):
+    def _turn_once(
+        self,
+        angle,
+        then,
+        timeout_ms,
+        absolute,
+        target_angle=None,
+    ):
         self.stop_drive()
         start_angle = self.drive_base.angle()
 
@@ -390,16 +397,52 @@ class Robot:
         else:
             self.drive_base.turn(angle, then=then, wait=False)
 
-        # Ein einziges frisches done() beendet den Durchlauf. Mehrere
-        # aufeinanderfolgende True-Werte zu verlangen kann bei aktiver
-        # Regelung endlos zwischen True und False pendeln.
+        target_timer = StopWatch()
+        target_since = None
+        target_fallback_used = [False]
+
+        def completed(done_state):
+            nonlocal target_since
+
+            if done_state:
+                return True
+            if target_angle is None:
+                return False
+
+            angular_velocity = self.hub.imu.angular_velocity()
+            turn_rate = max(abs(value) for value in angular_velocity)
+            target_reached = (
+                abs(target_angle - self.drive_base.angle())
+                <= config.TURN_COMPLETION_TOLERANCE_DEG
+                and turn_rate <= config.TURN_TARGET_MAX_RATE_DEG_S
+            )
+            if not target_reached:
+                target_since = None
+                return False
+
+            now = target_timer.time()
+            if target_since is None:
+                target_since = now
+                return False
+            if now - target_since < config.TURN_TARGET_SETTLE_MS:
+                return False
+
+            target_fallback_used[0] = True
+            return True
+
+        # Ein einziges frisches done() beendet den Durchlauf. Falls Pybricks
+        # bei erreichtem 180-Grad-Gyro-Ziel done() nicht setzt, beendet auch
+        # ein stabil erreichter echter Zielwinkel die Bewegung.
         self._wait_until_done(
             self.drive_base.done,
             timeout_ms,
             "turn",
             progress=lambda: abs(self.drive_base.angle() - start_angle),
             min_progress=config.MOTION_MIN_PROGRESS_DEG,
+            completion=completed,
         )
+        if target_fallback_used[0]:
+            self.stop_drive()
 
     def turn(
         self,
@@ -444,6 +487,7 @@ class Robot:
                 turn_then,
                 turn_timeout,
                 absolute,
+                target_angle,
             )
 
             if precise:
@@ -459,6 +503,7 @@ class Robot:
                         then,
                         turn_timeout,
                         absolute,
+                        target_angle,
                     )
                     error = target_angle - self.drive_base.angle()
 

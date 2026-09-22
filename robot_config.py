@@ -49,6 +49,12 @@ TURN_COMPLETION_TOLERANCE_DEG = 2
 # sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
 TURN_COMPENSATION_DEG = 6
 TURN_BRAKE_SETTLE_MS = 120
+# Manche Pybricks-Versionen lassen ``DriveBase.done()`` trotz erreichtem
+# Gyro-Ziel auf False, insbesondere bei einer 180-Grad-Drehung. Ist der echte
+# Zielwinkel fuer diese Dauer praktisch still erreicht, gilt die Drehung
+# trotzdem als beendet.
+TURN_TARGET_SETTLE_MS = 120
+TURN_TARGET_MAX_RATE_DEG_S = 3
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000
