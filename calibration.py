@@ -35,6 +35,8 @@ RUHE_DREHRATE_DEG_S = 4
 RUHEZEIT_MS = 180
 MESS_PAUSE_MS = 250
 TRACE_INTERVALL_MS = 100
+PROFIL_MAX_DAUER_MS = 3000
+PROFIL_MAX_FEHLER_DEG = 0.75
 
 
 def _drehrate(hub):
@@ -161,7 +163,8 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
     statistik = {}
 
     for max_rate in TEST_MAX_RATEN:
-        statistik[max_rate] = [0, 0, 0, 0]
+        # bestanden, gesamt, dauer_summe, max_fehler, max_dauer
+        statistik[max_rate] = [0, 0, 0, 0, 0]
 
         for wiederholung in range(1, WIEDERHOLUNGEN + 1):
             for ziel in TEST_WINKEL:
@@ -192,6 +195,7 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
                 profil[1] += 1
                 profil[2] += dauer
                 profil[3] = max(profil[3], abs(fehler))
+                profil[4] = max(profil[4], dauer)
 
                 print(
                     "CAL_RESULT,{},{},{},{:.3f},{:.3f},{},{:.3f},{}".format(
@@ -212,15 +216,21 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
         profil = statistik[max_rate]
         mittlere_dauer = profil[2] / profil[1]
         print(
-            "CAL_PROFILE,{},{},{},{:.1f},{:.3f}".format(
+            "CAL_PROFILE,{},{},{},{:.1f},{:.3f},{}".format(
                 max_rate,
                 profil[0],
                 profil[1],
                 mittlere_dauer,
                 profil[3],
+                profil[4],
             )
         )
-        if profil[0] == profil[1] and (
+        ist_zuverlaessig = (
+            profil[0] == profil[1]
+            and profil[3] <= PROFIL_MAX_FEHLER_DEG
+            and profil[4] <= PROFIL_MAX_DAUER_MS
+        )
+        if ist_zuverlaessig and (
             beste_dauer is None or mittlere_dauer < beste_dauer
         ):
             beste_rate = max_rate
