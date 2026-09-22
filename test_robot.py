@@ -224,6 +224,28 @@ class RobotTest(unittest.TestCase):
         self.assertLessEqual(abs(drive_base.angle() - 85), 1)
         self.assertTrue(drive_base.stopped)
 
+    def test_negative_turn_uses_same_early_brake(self):
+        class CrossingDriveBase(FakeDriveBase):
+            def __init__(self):
+                super().__init__(done_after=1000)
+                self.command_target = 0
+
+            def turn(self, angle, then, wait, absolute=False):
+                self.command_target = angle
+
+            def done(self):
+                self.done_checks += 1
+                self.current_angle = max(self.command_target, self.current_angle - 0.5)
+                return False
+
+        drive_base = CrossingDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(-85)
+
+        self.assertLessEqual(abs(drive_base.angle() + 85), 1)
+        self.assertTrue(drive_base.stopped)
+
     def test_large_turn_finishes_at_measured_target_before_done(self):
         class SlowLargeTurnDriveBase(FakeDriveBase):
             def done(self):

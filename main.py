@@ -13,8 +13,8 @@ from telemetry import Telemetry
 def create_force_sensor():
     try:
         return ForceSensor(config.FORCE_SENSOR_PORT)
-    except OSError as error:
-        print("FORCE_SENSOR_UNAVAILABLE", str(error))
+    except OSError:
+        print("FORCE_SENSOR_UNAVAILABLE port", config.FORCE_SENSOR_PORT)
         return None
 
 

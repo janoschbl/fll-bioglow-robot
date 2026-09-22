@@ -400,6 +400,7 @@ class Robot:
     ):
         self.stop_drive()
         start_angle = self.drive_base.angle()
+        direction = 1 if target_angle >= start_angle else -1
 
         if absolute:
             self.drive_base.turn(angle, then=then, wait=False, absolute=True)
@@ -427,6 +428,7 @@ class Robot:
             elapsed = timer.time()
             current_angle = self.drive_base.angle()
             error = target_angle - current_angle
+            remaining = error * direction
             done_state = self.drive_base.done()
             progress = abs(current_angle - start_angle)
 
@@ -464,13 +466,15 @@ class Robot:
                 )
                 return
 
-            in_target = armed and abs(error) <= config.TURN_TARGET_TOLERANCE_DEG
+            in_target = armed and remaining <= config.TURN_BRAKE_LEAD_DEG
             if in_target:
                 print(
                     "TURN_TARGET_REACHED",
                     "ms", elapsed,
                     "angle", current_angle,
                     "error", error,
+                    "remaining", remaining,
+                    "brake_lead", config.TURN_BRAKE_LEAD_DEG,
                 )
                 self.brake_drive()
                 print(

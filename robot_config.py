@@ -40,7 +40,9 @@ MOTOR_TIMEOUT_MS = 10000
 # Heading completion. Die schnelle Drehung wird beim ersten Erreichen des
 # echten Gyro-Ziels aktiv gebremst; es gibt keine zweite Korrekturbewegung.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_TARGET_TOLERANCE_DEG = 1
+# Drei reale 180-Grad-Laeufe drifteten nach dem Bremsbefehl noch
+# 1,65 bis 1,74 Grad weiter. Entsprechend frueh wird gebremst.
+TURN_BRAKE_LEAD_DEG = 1.7
 TURN_COMPLETION_TOLERANCE_DEG = 2
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
