@@ -41,9 +41,20 @@ MOTOR_TIMEOUT_MS = 10000
 # tolerance.  One degree leaves enough margin for the physical robot while
 # avoiding the several-degree default completion window.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_COMPLETION_TOLERANCE_DEG = 1.25
-TURN_CORRECTION_THRESHOLD_DEG = 1.0
-TURN_MAX_CORRECTIONS = 1
+TURN_CORRECTION_THRESHOLD_DEG = 0.75
+
+# Nach dem normalen DriveBase-Turn uebernimmt ein kleiner P-Regler die
+# Feinpositionierung. Er benutzt absichtlich nicht ``done()`` und kann daher
+# nicht in der Kombination aus ``done() == True`` und verfehltem Winkel
+# haengen bleiben.
+TURN_TRIM_P_GAIN = 2.0
+TURN_TRIM_MIN_RATE = 14
+TURN_TRIM_MAX_RATE = 45
+TURN_TRIM_NEAR_MAX_RATE = 28
+TURN_TRIM_NEAR_THRESHOLD_DEG = 5
+TURN_TRIM_YAW_TOLERANCE_DEG_S = 4
+TURN_TRIM_SETTLE_MS = 180
+TURN_TRIM_TIMEOUT_MS = 5000
 
 # stall fallback über encoder fortschritt
 STALL_TIMEOUT_MS = 6000

@@ -41,6 +41,14 @@ class FakeHub:
     buttons = FakeButtons()
 
 
+class FakeImu:
+    def angular_velocity(self):
+        return (0, 0, 0)
+
+
+FakeHub.imu = FakeImu()
+
+
 class FakeMotion:
     def __init__(self, done_after=2):
         self.done_after = done_after
@@ -82,6 +90,9 @@ class FakeDriveBase(FakeMotion):
             self.current_angle = angle
         else:
             self.current_angle += angle
+
+    def drive(self, speed, turn_rate):
+        self.current_angle += turn_rate * 0.01
 
     def distance(self):
         return self.current_distance
@@ -167,6 +178,19 @@ class RobotTest(unittest.TestCase):
 
         self.assertEqual(drive_base.started, (85, "hold", False, True))
         self.assertEqual(drive_base.angle(), 85)
+
+    def test_turn_trims_an_inaccurate_completed_motion(self):
+        class InaccurateDriveBase(FakeDriveBase):
+            def turn(self, angle, then, wait, absolute=False):
+                self.started = (angle, then, wait, absolute)
+                self.current_angle = angle - 5
+
+        drive_base = InaccurateDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(85, absolute=True)
+
+        self.assertLessEqual(abs(85 - drive_base.angle()), 0.75)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()

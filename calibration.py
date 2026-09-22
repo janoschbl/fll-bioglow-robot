@@ -1,95 +1,230 @@
-"""Repeatable DriveBase turn calibration.
+"""Eigenstaendige Kalibrierung fuer genaue Drehungen.
 
-Run this through the normal program menu.  Results are printed as one
-comma-separated line per test so they can be copied into a spreadsheet or
-parsed from the Pybricks console.
+Diese Datei kann in der Code-Werkstatt direkt als Startdatei ausgefuehrt
+werden. Sie importiert weder ``main.py`` noch ``programs.py``. Die Messwerte
+werden als CSV-Zeilen ausgegeben.
 """
 
-from pybricks.parameters import Stop
-from pybricks.tools import StopWatch
+from pybricks.hubs import PrimeHub
+from pybricks.parameters import Button, Direction, Port
+from pybricks.pupdevices import Motor
+from pybricks.robotics import DriveBase
+from pybricks.tools import StopWatch, wait
 
 
-# Edit these three lists to focus on the angles and motion profiles used in a
-# competition run.  The default matrix covers short/medium turns, both
-# directions, and slow through fast turn rates.
-CALIBRATION_ANGLES = (85, 135, -85, -135)
-CALIBRATION_TURN_RATES = (80, 120, 180, 240)
-CALIBRATION_TURN_ACCELERATIONS = (150, 300, 600)
+RAD_DURCHMESSER_MM = 62.4
+ACHSABSTAND_MM = 80
 
-CALIBRATION_SETTLE_MS = 250
-CALIBRATION_PAUSE_MS = 150
+LINKER_ANTRIEB = Port.C
+RECHTER_ANTRIEB = Port.D
+LINKS_RICHTUNG = Direction.COUNTERCLOCKWISE
+RECHTS_RICHTUNG = Direction.CLOCKWISE
+
+TEST_WINKEL = (85, -85, 135, -135)
+WIEDERHOLUNGEN = 3
+
+REGEL_INTERVALL_MS = 10
+REGEL_TIMEOUT_MS = 8000
+REGEL_KP = 2.0
+REGEL_MIN_RATE = 14
+REGEL_MAX_RATE = 90
+REGEL_NAH_MAX_RATE = 28
+REGEL_NAH_GRENZE_DEG = 5
+ZIEL_TOLERANZ_DEG = 0.75
+RUHE_DREHRATE_DEG_S = 4
+RUHEZEIT_MS = 180
+MESS_PAUSE_MS = 250
+TRACE_INTERVALL_MS = 100
 
 
-def _yaw_rate(hub):
+def _drehrate(hub):
     try:
-        # PrimeHub is mounted flat in this robot, so the third component is
-        # the yaw rate.  Keep this helper defensive for older firmware.
         return hub.imu.angular_velocity()[2]
     except Exception:
         return 0
 
 
-def _run_turn(robot, target):
-    """Prefer absolute turns, with a compatibility fallback for old firmware."""
-    try:
-        robot.turn(target, then=Stop.HOLD, precise=False, absolute=True)
-        return "absolute"
-    except TypeError:
-        robot.turn(target, then=Stop.HOLD, precise=False)
-        return "relative_fallback"
+def _begrenzen(wert, minimum, maximum):
+    return max(minimum, min(maximum, wert))
+
+
+def _abbruch_pruefen(hub):
+    if Button.CENTER in hub.buttons.pressed():
+        raise SystemExit("Kalibrierung am Hub abgebrochen")
+
+
+def _antrieb_bremsen(drive_base, linker_motor, rechter_motor):
+    drive_base.stop()
+    linker_motor.brake()
+    rechter_motor.brake()
+
+
+def genaue_drehung(
+    hub,
+    drive_base,
+    linker_motor,
+    rechter_motor,
+    ziel,
+):
+    """Regelt auf einen absoluten DriveBase-Winkel, ohne ``done()``."""
+    uhr = StopWatch()
+    ruhig_seit = None
+    naechster_trace = 0
+    letzter_befehl = 0
+
+    while True:
+        _abbruch_pruefen(hub)
+
+        jetzt = uhr.time()
+        winkel = drive_base.angle()
+        fehler = ziel - winkel
+        drehrate = _drehrate(hub)
+
+        if abs(fehler) <= ZIEL_TOLERANZ_DEG:
+            if letzter_befehl != 0:
+                drive_base.stop()
+                letzter_befehl = 0
+
+            if abs(drehrate) <= RUHE_DREHRATE_DEG_S:
+                if ruhig_seit is None:
+                    ruhig_seit = jetzt
+                elif jetzt - ruhig_seit >= RUHEZEIT_MS:
+                    _antrieb_bremsen(
+                        drive_base,
+                        linker_motor,
+                        rechter_motor,
+                    )
+                    return jetzt
+            else:
+                ruhig_seit = None
+        else:
+            ruhig_seit = None
+            maximum = (
+                REGEL_NAH_MAX_RATE
+                if abs(fehler) <= REGEL_NAH_GRENZE_DEG
+                else REGEL_MAX_RATE
+            )
+            befehl = _begrenzen(
+                abs(fehler) * REGEL_KP,
+                REGEL_MIN_RATE,
+                maximum,
+            )
+            if fehler < 0:
+                befehl = -befehl
+
+            drive_base.drive(0, befehl)
+            letzter_befehl = befehl
+
+        if jetzt >= naechster_trace:
+            print(
+                "CAL_TRACE,{},{:.3f},{:.3f},{:.3f},{:.3f}".format(
+                    ziel,
+                    winkel,
+                    fehler,
+                    drehrate,
+                    letzter_befehl,
+                )
+            )
+            naechster_trace += TRACE_INTERVALL_MS
+
+        if jetzt >= REGEL_TIMEOUT_MS:
+            _antrieb_bremsen(
+                drive_base,
+                linker_motor,
+                rechter_motor,
+            )
+            raise RuntimeError(
+                "Drehung nach {} ms nicht stabil: Ziel {}, Winkel {:.3f}, Fehler {:.3f}".format(
+                    jetzt,
+                    ziel,
+                    winkel,
+                    fehler,
+                )
+            )
+
+        wait(REGEL_INTERVALL_MS)
+
+
+def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
+    drive_base.use_gyro(True)
+    print("CAL_BEGIN")
+    print(
+        "CAL_FIELDS,wiederholung,ziel_deg,"
+        "endwinkel_deg,fehler_deg,dauer_ms,"
+        "ruhe_drehrate_deg_s,bestanden"
+    )
+
+    bestanden = 0
+    gesamt = 0
+
+    for wiederholung in range(1, WIEDERHOLUNGEN + 1):
+        for ziel in TEST_WINKEL:
+            _abbruch_pruefen(hub)
+            drive_base.reset(distance=drive_base.distance(), angle=0)
+            wait(MESS_PAUSE_MS)
+
+            dauer = genaue_drehung(
+                hub,
+                drive_base,
+                linker_motor,
+                rechter_motor,
+                ziel,
+            )
+            wait(MESS_PAUSE_MS)
+
+            endwinkel = drive_base.angle()
+            fehler = ziel - endwinkel
+            ruhe_drehrate = _drehrate(hub)
+            ist_bestanden = abs(fehler) < 2
+            gesamt += 1
+            if ist_bestanden:
+                bestanden += 1
+
+            print(
+                "CAL_RESULT,{},{},{:.3f},{:.3f},{},{:.3f},{}".format(
+                    wiederholung,
+                    ziel,
+                    endwinkel,
+                    fehler,
+                    dauer,
+                    ruhe_drehrate,
+                    1 if ist_bestanden else 0,
+                )
+            )
+
+    _antrieb_bremsen(drive_base, linker_motor, rechter_motor)
+    print("CAL_SUMMARY,{},{},{}".format(bestanden, gesamt, gesamt - bestanden))
+    print("CAL_END")
 
 
 def run(robot):
-    robot.set_gyro_use(True)
-    robot.reset_drivebase_settings()
+    """Kompatibler Einstieg fuer einen optionalen Menue-Aufruf."""
+    kalibrieren(
+        robot.hub,
+        robot.drive_base,
+        robot.left_drive_motor,
+        robot.right_drive_motor,
+    )
 
-    print("CAL_BEGIN")
-    print("CAL_FIELDS,mode,target_deg,turn_rate,turn_accel,raw_delta_deg,raw_error_deg,settled_delta_deg,settled_error_deg,duration_ms,final_yaw_rate")
 
-    for turn_acceleration in CALIBRATION_TURN_ACCELERATIONS:
-        for turn_rate in CALIBRATION_TURN_RATES:
-            robot.set_drivebase_settings(
-                turn_rate=turn_rate,
-                turn_acceleration=turn_acceleration,
-            )
+def main():
+    hub = PrimeHub()
+    hub.system.set_stop_button(Button.BLUETOOTH)
 
-            for target in CALIBRATION_ANGLES:
-                robot.check_abort()
-                robot.reset_heading(0)
-                robot.wait(CALIBRATION_PAUSE_MS)
+    linker_motor = Motor(LINKER_ANTRIEB, LINKS_RICHTUNG)
+    rechter_motor = Motor(RECHTER_ANTRIEB, RECHTS_RICHTUNG)
+    drive_base = DriveBase(
+        linker_motor,
+        rechter_motor,
+        wheel_diameter=RAD_DURCHMESSER_MM,
+        axle_track=ACHSABSTAND_MM,
+    )
 
-                start_angle = robot.drive_base.angle()
-                watch = StopWatch()
-                mode = _run_turn(robot, target)
-                raw_angle = robot.drive_base.angle()
-                raw_delta = raw_angle - start_angle
-                raw_error = target - raw_delta
-                duration = watch.time()
+    try:
+        kalibrieren(hub, drive_base, linker_motor, rechter_motor)
+    finally:
+        _antrieb_bremsen(drive_base, linker_motor, rechter_motor)
 
-                # This delay is only for measurement.  Production turns do
-                # not pay this cost; it shows whether HOLD continues to move
-                # the robot after Pybricks first reports done().
-                robot.wait(CALIBRATION_SETTLE_MS)
-                settled_angle = robot.drive_base.angle()
-                settled_delta = settled_angle - start_angle
-                settled_error = target - settled_delta
-                final_yaw_rate = _yaw_rate(robot.hub)
 
-                print(
-                    "CAL_RESULT,{},{},{},{},{:.3f},{:.3f},{:.3f},{:.3f},{},{}".format(
-                        mode,
-                        target,
-                        turn_rate,
-                        turn_acceleration,
-                        raw_delta,
-                        raw_error,
-                        settled_delta,
-                        settled_error,
-                        duration,
-                        final_yaw_rate,
-                    )
-                )
-
-    robot.stop_drive()
-    robot.reset_drivebase_settings()
-    print("CAL_END")
+if __name__ == "__main__":
+    main()

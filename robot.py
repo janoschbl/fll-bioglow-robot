@@ -372,7 +372,7 @@ class Robot:
         self._telemetry_event("straight", 1, distance)
         return True
 
-    def _turn_once(self, angle, target_angle, then, timeout_ms, absolute):
+    def _turn_once(self, angle, then, timeout_ms, absolute):
         self.stop_drive()
 
         if absolute:
@@ -382,21 +382,68 @@ class Robot:
 
         start_angle = self.drive_base.angle()
 
-        def turn_complete(done_state):
-            return (
-                done_state
-                and abs(target_angle - self.drive_base.angle())
-                <= config.TURN_COMPLETION_TOLERANCE_DEG
-            )
-
         self._wait_until_done(
             self.drive_base.done,
             timeout_ms,
             "turn",
             progress=lambda: abs(self.drive_base.angle() - start_angle),
             min_progress=config.MOTION_MIN_PROGRESS_DEG,
-            completion=turn_complete,
         )
+
+    def _yaw_rate(self):
+        try:
+            return self.hub.imu.angular_velocity()[2]
+        except Exception:
+            return 0
+
+    def _trim_heading(self, target_angle):
+        """Regelt den letzten Winkelfehler ohne das schwankende ``done()``."""
+        timer = StopWatch()
+        settled_since = None
+        command = 0
+
+        while True:
+            self.check_abort()
+            self._telemetry_tick()
+
+            now = timer.time()
+            angle = self.drive_base.angle()
+            error = target_angle - angle
+            yaw_rate = self._yaw_rate()
+
+            if abs(error) <= config.TURN_CORRECTION_THRESHOLD_DEG:
+                if command != 0:
+                    self.stop_drive()
+                    command = 0
+
+                if abs(yaw_rate) <= config.TURN_TRIM_YAW_TOLERANCE_DEG_S:
+                    if settled_since is None:
+                        settled_since = now
+                    elif now - settled_since >= config.TURN_TRIM_SETTLE_MS:
+                        self.stop_drive()
+                        return
+                else:
+                    settled_since = None
+            else:
+                settled_since = None
+                maximum = (
+                    config.TURN_TRIM_NEAR_MAX_RATE
+                    if abs(error) <= config.TURN_TRIM_NEAR_THRESHOLD_DEG
+                    else config.TURN_TRIM_MAX_RATE
+                )
+                command = max(
+                    config.TURN_TRIM_MIN_RATE,
+                    min(maximum, abs(error) * config.TURN_TRIM_P_GAIN),
+                )
+                if error < 0:
+                    command = -command
+                self.drive_base.drive(0, command)
+
+            if now >= config.TURN_TRIM_TIMEOUT_MS:
+                self.stop_drive()
+                raise MotionTimeout("turn trim timed out")
+
+            wait(config.MOTION_POLL_MS)
 
     def turn(
         self,
@@ -417,23 +464,14 @@ class Robot:
             turn_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
-            self._turn_once(angle, target_angle, then, turn_timeout, absolute)
+            # HOLD bewegt den Roboter nach dem ersten ``done()`` oft noch
+            # mehrere Grad weiter. Fuer genaue Drehungen passiv bremsen und
+            # danach kontrolliert feinregeln.
+            turn_then = Stop.BRAKE if precise else then
+            self._turn_once(angle, turn_then, turn_timeout, absolute)
 
             if precise:
-                for _ in range(config.TURN_MAX_CORRECTIONS):
-                    error = target_angle - self.drive_base.angle()
-                    if abs(error) < config.TURN_CORRECTION_THRESHOLD_DEG:
-                        break
-                    if absolute:
-                        self._turn_once(
-                            target_angle,
-                            target_angle,
-                            then,
-                            turn_timeout,
-                            True,
-                        )
-                    else:
-                        self._turn_once(error, target_angle, then, turn_timeout, False)
+                self._trim_heading(target_angle)
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
