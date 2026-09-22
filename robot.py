@@ -161,6 +161,12 @@ class Robot:
         self.drive_base.reset(distance=distance, angle=angle)
         self._telemetry_event("reset_heading", 1, angle)
 
+    def _reset_drive_control(self):
+        """Verwirft alte Fahrziele, ohne Weg oder Richtung zu veraendern."""
+        distance = self.drive_base.distance()
+        angle = self.drive_base.angle()
+        self.drive_base.reset(distance=distance, angle=angle)
+
     def straight_task(self, distance, then=Stop.HOLD, timeout_ms=None):
         """Beschreibt eine Geradeausfahrt für ``multitask``."""
         return ("straight", distance, then, timeout_ms)
@@ -208,7 +214,7 @@ class Robot:
                         else timeout_ms
                     )
                     self._telemetry_event("straight", 0, distance)
-                    self.stop_drive()
+                    self._reset_drive_control()
                     self.drive_base.straight(distance, then=then, wait=False)
                     start_distance = self.drive_base.distance()
                     active.append({
@@ -352,7 +358,10 @@ class Robot:
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
-        self.stop_drive()
+        # reset() beendet den vorherigen Regler und setzt den aktuellen
+        # Gyro-Winkel sofort als neue Nullabweichung fuer diese Gerade. Weg und
+        # Winkelwerte bleiben dabei numerisch unveraendert.
+        self._reset_drive_control()
         start_distance = self.drive_base.distance()
         self.drive_base.straight(distance, then=then, wait=False)
 

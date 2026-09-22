@@ -170,6 +170,7 @@ class RobotTest(unittest.TestCase):
         robot.straight(600)
 
         self.assertEqual(drive_base.done_checks, 4)
+        self.assertEqual(drive_base.reset_values, (123, 0))
 
     def test_turn_can_use_absolute_heading(self):
         robot, drive_base, _ = make_robot()
