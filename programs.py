@@ -20,8 +20,8 @@ def load(program, robot):
         robot.set_drivebase_settings(straight_speed=800)
         robot.straight(-500)
 
-    """
-    @program(5, "Mariia")
+
+    @program(6, "Mariia")
     def mariia():
         robot.set_gyro_use(True)
         robot.straight(600)
@@ -38,7 +38,6 @@ def load(program, robot):
         robot.straight(600)
         robot.turn(30)
         robot.straight(200)
-    """
     
     @program(3, "Drohnenfiech")
     def drohnenfiech():
@@ -48,7 +47,7 @@ def load(program, robot):
         robot.turn(70)
         robot.straight(-200)
 
-    @program(1, "setup")
+    @program(7, "setup")
     def setupmotor():
         robot.motor_target(robot.right_motor, 300, 45)
         robot.motor_target(robot.left_motor, 300, 0)
@@ -76,7 +75,7 @@ def load(program, robot):
         robot.motor_angle(robot.right_motor, 1000, -380)
                         
 
-    """
+    
     @program(5, "gamble")
     def gamble():   
         robot.reset_drivebase_settings()
@@ -99,4 +98,12 @@ def load(program, robot):
         robot.straight(-500)
         robot.turn(30)
         robot.straight(-300)
-    """
+
+    @program(1, "testProgram")
+    def testprogramm():
+        robot.reset_drivebase_settings()
+        robot.set_gyro_use(True)
+        robot.straight(800)
+        robot.turn(180)
+        robot.straight(800)
+        
