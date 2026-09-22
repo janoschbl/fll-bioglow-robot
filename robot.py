@@ -436,7 +436,6 @@ class Robot:
             turn_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
-            total_timer = StopWatch()
             # Der reale Antrieb verliert beim Abbremsen etwa sechs Grad. Die
             # Vorsteuerung erledigt das in derselben schnellen Bewegung.
             turn_then = Stop.BRAKE if precise else then
@@ -453,11 +452,6 @@ class Robot:
                     if absolute
                     else angle + compensation
                 )
-                turn_timeout = min(
-                    turn_timeout,
-                    config.TURN_TOTAL_TIMEOUT_MS
-                    - config.TURN_BRAKE_SETTLE_MS,
-                )
             else:
                 commanded_angle = angle
 
@@ -472,8 +466,6 @@ class Robot:
                 # Stop.BRAKE aktiv lassen. stop_drive() an dieser Stelle
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
-                if total_timer.time() >= config.TURN_TOTAL_TIMEOUT_MS:
-                    raise MotionTimeout("turn exceeded 1500 ms")
                 error = target_angle - self.drive_base.angle()
                 if abs(error) >= config.TURN_CORRECTION_THRESHOLD_DEG:
                     print("TURN_ACCURACY_WARNING", target_angle, error)
