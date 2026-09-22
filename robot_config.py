@@ -48,7 +48,12 @@ TURN_CORRECTION_THRESHOLD_DEG = 2
 # sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
 TURN_COMPENSATION_DEG = 6
 TURN_DONE_STABLE_MS = 50
-TURN_BRAKE_SETTLE_MS = 120
+# Nach einer Drehung darf die naechste Gerade erst beginnen, wenn der Roboter
+# wirklich nicht mehr rotiert. Sonst interpretiert der Gyro-Regler die
+# Restbewegung beim Anfahren als Richtungsfehler und lenkt abwechselnd dagegen.
+TURN_SETTLE_RATE_DEG_S = 3
+TURN_SETTLE_STABLE_MS = 80
+TURN_SETTLE_TIMEOUT_MS = 350
 TURN_TOTAL_TIMEOUT_MS = 1500
 
 # stall fallback über encoder fortschritt
