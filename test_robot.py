@@ -65,6 +65,9 @@ class FakeMotion:
     def stop(self):
         self.stopped = True
 
+    def brake(self):
+        self.stopped = True
+
     def angle(self):
         return self.current_angle
 
@@ -196,48 +199,29 @@ class RobotTest(unittest.TestCase):
         self.assertLess(abs(85 - drive_base.angle()), 2)
         self.assertLess(FakeStopWatch.now, 1500)
 
-    def test_turn_uses_active_correction_to_reach_target_angle(self):
-        class CorrectableDriveBase(FakeDriveBase):
+    def test_turn_brakes_during_single_motion_at_measured_target(self):
+        class CrossingDriveBase(FakeDriveBase):
             def __init__(self):
-                super().__init__()
+                super().__init__(done_after=1000)
                 self.turn_calls = []
+                self.command_target = 0
 
             def turn(self, angle, then, wait, absolute=False):
                 self.turn_calls.append(angle)
-                if len(self.turn_calls) == 1:
-                    self.current_angle += angle - 11
-                else:
-                    self.current_angle += angle - 6
+                self.command_target = angle
 
-        drive_base = CorrectableDriveBase()
+            def done(self):
+                self.done_checks += 1
+                self.current_angle = min(self.command_target, self.current_angle + 0.5)
+                return False
+
+        drive_base = CrossingDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
         robot.turn(85)
 
-        self.assertEqual(drive_base.turn_calls, [91, 11])
+        self.assertEqual(drive_base.turn_calls, [91])
         self.assertLessEqual(abs(drive_base.angle() - 85), 1)
-        self.assertTrue(drive_base.stopped)
-
-    def test_turn_corrects_four_degree_tire_error_with_compensation(self):
-        class TireLimitedDriveBase(FakeDriveBase):
-            def __init__(self):
-                super().__init__()
-                self.turn_calls = []
-
-            def turn(self, angle, then, wait, absolute=False):
-                self.turn_calls.append(angle)
-                if len(self.turn_calls) == 1:
-                    self.current_angle += angle + 0.5
-                else:
-                    self.current_angle += angle + 6
-
-        drive_base = TireLimitedDriveBase()
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        robot.turn(180)
-
-        self.assertEqual(drive_base.turn_calls, [183, -9.5])
-        self.assertLessEqual(abs(drive_base.angle() - 180), 1)
         self.assertTrue(drive_base.stopped)
 
     def test_large_turn_finishes_at_measured_target_before_done(self):
@@ -252,7 +236,7 @@ class RobotTest(unittest.TestCase):
 
         robot.turn(180, precise=False)
 
-        self.assertEqual(FakeStopWatch.now, config.TURN_TARGET_SETTLE_MS)
+        self.assertEqual(FakeStopWatch.now, 0)
         self.assertLess(FakeStopWatch.now, 2000)
 
     def test_precise_180_turn_finishes_at_stable_gyro_target(self):
@@ -263,16 +247,14 @@ class RobotTest(unittest.TestCase):
 
             def turn(self, angle, then, wait, absolute=False):
                 self.started = (angle, then, wait, absolute)
-                # Die Vorsteuerung befiehlt 183 Grad, der reale Roboter steht
-                # nach dem Abbremsen exakt am gewuenschten 180-Grad-Ziel.
-                self.current_angle += angle - config.TURN_LARGE_COMPENSATION_DEG
+                self.current_angle = 180
 
         drive_base = StuckDoneAtTargetDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
         robot.turn(180)
 
-        self.assertEqual(drive_base.started, (183, "brake", False, False))
+        self.assertEqual(drive_base.started, (186, "brake", False, False))
         self.assertEqual(drive_base.angle(), 180)
         self.assertTrue(drive_base.stopped)
         self.assertLess(FakeStopWatch.now, 1000)

@@ -37,29 +37,21 @@ MOTION_MIN_PROGRESS_MM = 2
 DRIVE_TIMEOUT_MS = 20000
 MOTOR_TIMEOUT_MS = 10000
 
-# Heading completion. Kleine Korrekturen erhalten ihre eigene Vorsteuerung,
-# damit das Positionsprofil die Haftreibung der Reifen sicher ueberwindet.
+# Heading completion. Die schnelle Drehung wird beim ersten Erreichen des
+# echten Gyro-Ziels aktiv gebremst; es gibt keine zweite Korrekturbewegung.
 TURN_POSITION_TOLERANCE_DEG = 1
-TURN_CORRECTION_THRESHOLD_DEG = 1
-TURN_COMPLETION_TOLERANCE_DEG = 1
-TURN_CORRECTION_TIMEOUT_MS = 4000
-TURN_CORRECTION_ATTEMPTS = 2
+TURN_TARGET_TOLERANCE_DEG = 1
+TURN_COMPLETION_TOLERANCE_DEG = 2
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
 # 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
 # sechs Grad vor dem echten Gyro-Ziel; diese Totzone wird direkt vorgegeben.
 TURN_COMPENSATION_DEG = 6
-# Der reale 180-Grad-Lauf verliert nur rund drei Grad: 186 Grad Befehl ergaben
-# 182,95 Grad. Grosse Drehungen brauchen deshalb weniger Vorsteuerung als die
-# kurzen Korrekturen, bei denen die Haftreibung staerker ins Gewicht faellt.
-TURN_LARGE_ANGLE_THRESHOLD_DEG = 90
-TURN_LARGE_COMPENSATION_DEG = 3
 TURN_BRAKE_SETTLE_MS = 120
 # Manche Pybricks-Versionen lassen ``DriveBase.done()`` trotz erreichtem
 # Gyro-Ziel auf False, insbesondere bei einer 180-Grad-Drehung. Ist der echte
 # Zielwinkel fuer diese Dauer praktisch still erreicht, gilt die Drehung
 # trotzdem als beendet.
-TURN_TARGET_SETTLE_MS = 120
 TURN_LOG_INTERVAL_MS = 250
 
 # stall fallback über encoder fortschritt

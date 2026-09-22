@@ -101,6 +101,15 @@ class Robot:
                 except Exception as error:
                     print("STOP_ERROR drive_motor", str(error))
 
+    def brake_drive(self):
+        """Beendet den DriveBase-Regler und bremst beide Fahrmotoren sofort."""
+        self.stop_drive()
+        for motor in self.drive_motors:
+            try:
+                motor.brake()
+            except Exception as error:
+                print("BRAKE_ERROR drive_motor", str(error))
+
     def stop_attachment(self, motor):
         try:
             motor.stop()
@@ -398,7 +407,6 @@ class Robot:
             self.drive_base.turn(angle, then=then, wait=False)
 
         timer = StopWatch()
-        target_since = None
         next_log = 0
         armed = False
         saw_not_done = False
@@ -456,41 +464,23 @@ class Robot:
                 )
                 return
 
-            in_target = (
-                armed
-                and abs(error) <= config.TURN_COMPLETION_TOLERANCE_DEG
-            )
+            in_target = armed and abs(error) <= config.TURN_TARGET_TOLERANCE_DEG
             if in_target:
-                if target_since is None:
-                    target_since = elapsed
-                    print(
-                        "TURN_TARGET_ENTER",
-                        "ms", elapsed,
-                        "angle", current_angle,
-                        "error", error,
-                    )
-                elif elapsed - target_since >= config.TURN_TARGET_SETTLE_MS:
-                    # Der echte Gyro-Winkel ist stabil am Ziel. Pybricks kann
-                    # bei 180 Grad trotzdem done() == False liefern. Deshalb
-                    # beenden wir den Regler selbst und fahren im Programm fort.
-                    self.stop_drive()
-                    print(
-                        "TURN_DONE",
-                        "ms", elapsed,
-                        "angle", current_angle,
-                        "error", error,
-                        "source", "measured_angle",
-                        "stable_ms", elapsed - target_since,
-                    )
-                    return
-            elif target_since is not None:
                 print(
-                    "TURN_TARGET_LEFT",
+                    "TURN_TARGET_REACHED",
                     "ms", elapsed,
                     "angle", current_angle,
                     "error", error,
                 )
-                target_since = None
+                self.brake_drive()
+                print(
+                    "TURN_DONE",
+                    "ms", elapsed,
+                    "angle", self.drive_base.angle(),
+                    "error", target_angle - self.drive_base.angle(),
+                    "source", "measured_angle_brake",
+                )
+                return
 
             if elapsed >= timeout_ms:
                 print(
@@ -534,12 +524,17 @@ class Robot:
             turn_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
-            # Der reale Antrieb verliert beim Abbremsen etwa sechs Grad. Die
-            # winkelabhaengige Vorsteuerung erledigt das in derselben Bewegung.
+            # Die Vorsteuerung sorgt nur dafuer, dass die schnelle Bewegung
+            # sicher durch das Ziel laeuft. _turn_once bremst bereits dort ab.
             turn_then = Stop.BRAKE if precise else then
             if precise:
                 delta = target_angle - start_angle
-                compensation = self._turn_compensation(delta)
+                if delta > 0:
+                    compensation = config.TURN_COMPENSATION_DEG
+                elif delta < 0:
+                    compensation = -config.TURN_COMPENSATION_DEG
+                else:
+                    compensation = 0
                 commanded_angle = (
                     target_angle + compensation
                     if absolute
@@ -561,36 +556,6 @@ class Robot:
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
                 error = target_angle - self.drive_base.angle()
-                for attempt in range(config.TURN_CORRECTION_ATTEMPTS):
-                    if abs(error) <= config.TURN_CORRECTION_THRESHOLD_DEG:
-                        break
-                    compensation = self._turn_compensation(error)
-                    correction = error + compensation
-                    print(
-                        "TURN_CORRECTION_START",
-                        "attempt", attempt + 1,
-                        "target", target_angle,
-                        "angle", self.drive_base.angle(),
-                        "error", error,
-                        "compensation", compensation,
-                        "command", correction,
-                    )
-                    self._turn_once(
-                        correction,
-                        Stop.BRAKE,
-                        config.TURN_CORRECTION_TIMEOUT_MS,
-                        False,
-                        target_angle,
-                    )
-                    self.wait(config.TURN_BRAKE_SETTLE_MS)
-                    error = target_angle - self.drive_base.angle()
-                    print(
-                        "TURN_CORRECTION_RESULT",
-                        "attempt", attempt + 1,
-                        "target", target_angle,
-                        "angle", self.drive_base.angle(),
-                        "error", error,
-                    )
 
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
                     print("TURN_ACCURACY_ERROR", target_angle, error)
@@ -613,16 +578,6 @@ class Robot:
         )
         self._telemetry_event("turn", 1, angle)
         return True
-
-    def _turn_compensation(self, delta):
-        if delta == 0:
-            return 0
-        amount = (
-            config.TURN_LARGE_COMPENSATION_DEG
-            if abs(delta) >= config.TURN_LARGE_ANGLE_THRESHOLD_DEG
-            else config.TURN_COMPENSATION_DEG
-        )
-        return amount if delta > 0 else -amount
 
     def turn_to(self, heading, then=Stop.HOLD, timeout_ms=None, precise=True):
         """Turns to an absolute gyro heading when supported by the firmware."""
