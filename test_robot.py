@@ -226,6 +226,20 @@ class RobotTest(unittest.TestCase):
         self.assertLess(abs(85 - drive_base.angle()), 2)
         self.assertLess(FakeStopWatch.now, 1500)
 
+    def test_turn_does_not_abort_on_done_with_tire_tolerance(self):
+        class TireLimitedDriveBase(FakeDriveBase):
+            def turn(self, angle, then, wait, absolute=False):
+                self.started = (angle, then, wait, absolute)
+                self.current_angle += angle - 9
+
+        drive_base = TireLimitedDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        result = robot.turn(85)
+
+        self.assertTrue(result)
+        self.assertEqual(drive_base.angle(), 82)
+
     def test_turn_brakes_during_single_motion_at_measured_target(self):
         class CrossingDriveBase(FakeDriveBase):
             def __init__(self):

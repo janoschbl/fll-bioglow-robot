@@ -50,7 +50,10 @@ TURN_POSITION_TOLERANCE_DEG = 1
 # Drei reale 180-Grad-Laeufe drifteten nach dem Bremsbefehl noch
 # 1,65 bis 1,74 Grad weiter. Entsprechend frueh wird gebremst.
 TURN_BRAKE_LEAD_DEG = 1.7
-TURN_COMPLETION_TOLERANCE_DEG = 2
+# Bis vier Grad sind auf den griffigen Reifen als normales mechanisches
+# Restfenster akzeptiert. Genauigkeitsabweichungen duerfen einen Wettbewerbslauf
+# nicht wie ein echtes Bewegungs-Timeout abbrechen.
+TURN_COMPLETION_TOLERANCE_DEG = 4
 
 # Reale Messung am Roboter fuer +/-33 und +/-47 Grad: 12/12 Laeufe unter
 # 2 Grad Fehler und 1,5 Sekunden. Der DriveBase-Regler meldet sein Ende etwa
