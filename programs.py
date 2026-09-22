@@ -21,7 +21,7 @@ def load(program, robot):
         robot.straight(-500)
 
 
-    @program(6, "Mariia")
+    @program(5, "Mariia")
     def mariia():
         robot.set_gyro_use(True)
         robot.straight(600)
@@ -47,7 +47,7 @@ def load(program, robot):
         robot.turn(70)
         robot.straight(-200)
 
-    @program(7, "setup")
+    @program(1, "setup")
     def setupmotor():
         robot.motor_target(robot.right_motor, 300, 45)
         robot.motor_target(robot.left_motor, 300, 0)
@@ -74,36 +74,4 @@ def load(program, robot):
         robot.straight(75)
         robot.motor_angle(robot.right_motor, 1000, -380)
                         
-
-    
-    @program(5, "gamble")
-    def gamble():   
-        robot.reset_drivebase_settings()
-        robot.set_drivebase_settings(600)
-        robot.set_gyro_use(True)
-        robot.straight(-50)
-        robot.reset_heading(0)
-        robot.turn(40)
-        robot.straight(750)
-        robot.turn(105)
-        robot.motor_angle(robot.left_motor, 300, -110)
-        robot.straight(-330)
-        robot.motor_angle(robot.left_motor, 300, 110)
-        robot.straight(95)
-        robot.turn(-125)
-        robot.motor_angle(robot.right_motor, 300, -140)
-        robot.straight(130)
-        robot.motor_angle(robot.right_motor, 1400, -390)
-        robot.set_drivebase_settings(straight_speed=1000)
-        robot.straight(-500)
-        robot.turn(30)
-        robot.straight(-300)
-
-    @program(1, "testProgram")
-    def testprogramm():
-        robot.reset_drivebase_settings()
-        robot.set_gyro_use(True)
-        robot.straight(800)
-        robot.turn(180)
-        robot.straight(800)
         
