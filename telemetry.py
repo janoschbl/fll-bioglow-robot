@@ -89,8 +89,6 @@ class Telemetry:
         self.buffer_full = False
 
     def begin(self, name):
-        # Pybricks verwendet kleine 30-Bit-Integer. 0xFFFFFFFF und die vollen
-        # int32-Grenzen lösen bereits beim Laden des Moduls einen Overflow aus.
         self.run_id = (self.run_id + 1) & 0x3FFFFFFF
         self.run_name = str(name)[:80]
         self.started_ms = self.clock.time()
@@ -121,7 +119,6 @@ class Telemetry:
         try:
             self.data.extend(record)
         except MemoryError:
-            # Telemetrie darf die Robotersteuerung auch bei knappem RAM nie stoppen.
             self.buffer_full = True
             self.dropped += 1
             return False

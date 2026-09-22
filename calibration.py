@@ -22,9 +22,6 @@ LINKS_RICHTUNG = Direction.COUNTERCLOCKWISE
 RECHTS_RICHTUNG = Direction.CLOCKWISE
 
 TEST_WINKEL = (33, -33, 47, -47)
-# Die erste Messreihe zeigte bei 100 Grad/s und 300 Grad/s2 die beste
-# Genauigkeit. Jetzt wird die mechanisch unterschiedliche Unterdrehung nach
-# rechts und links direkt im schnellen Fahrbefehl ausgeglichen.
 TEST_PROFILE = ((100, 300, 6.0, 6.0),)
 WIEDERHOLUNGEN = 5
 
@@ -108,8 +105,6 @@ def schnelle_drehung(
     fahrziel = ziel + zugabe if ziel >= 0 else ziel - zugabe
     _fahr_drehung(hub, drive_base, fahrziel, gesamt_uhr)
 
-    # Stop.BRAKE muss die Bewegung erst wirklich abbauen. Ein sofortiges
-    # drive_base.stop() wuerde die aktive Bremse aufheben und unterdrehen.
     wait(BREMSZEIT_MS)
     dauer = gesamt_uhr.time()
     endwinkel = drive_base.angle()
@@ -142,7 +137,6 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
 
     for rate, beschleunigung, zugabe_rechts, zugabe_links in TEST_PROFILE:
         schluessel = (rate, beschleunigung, zugabe_rechts, zugabe_links)
-        # bestanden, gesamt, dauer_summe, max_fehler, max_dauer
         statistik[schluessel] = [0, 0, 0, 0, 0]
 
         for wiederholung in range(1, WIEDERHOLUNGEN + 1):

@@ -5,10 +5,14 @@ import robot_config as config
 
 
 class ProgramAborted(Exception):
+    """Signalisiert einen durch den Benutzer abgebrochenen Programmlauf."""
+
     pass
 
 
 class MotionTimeout(Exception):
+    """Signalisiert eine Bewegung, die ihr Zeitlimit überschritten hat."""
+
     pass
 
 
@@ -22,6 +26,15 @@ class Robot:
         left_drive_motor,
         right_drive_motor,
     ):
+        """Initialisiert die Robotersteuerung mit Hub, DriveBase und Motoren.
+
+        :param hub: Pybricks-Hub mit Tasten- und Sensorschnittstellen.
+        :param drive_base: Konfigurierte Pybricks-DriveBase.
+        :param left_motor: Linker Anbaumotor.
+        :param right_motor: Rechter Anbaumotor.
+        :param left_drive_motor: Linker Fahrmotor.
+        :param right_drive_motor: Rechter Fahrmotor.
+        """
         self.hub = hub
         self.drive_base = drive_base
         self.left_motor = left_motor
@@ -37,32 +50,60 @@ class Robot:
         self.telemetry = None
 
     def set_telemetry(self, telemetry):
+        """Setzt den Empfänger für Lauf- und Bewegungsdaten.
+
+        :param telemetry: Telemetrieobjekt oder ``None`` zum Deaktivieren.
+        """
         self.telemetry = telemetry
 
     def begin_program(self, name="run"):
+        """Beginnt einen Programmlauf und setzt den Abbruchzustand zurück.
+
+        :param name: Name des Programmlaufs für die Telemetrie.
+        """
         self.requested_stop = False
         self.previous_buttons = set(self.hub.buttons.pressed())
         if self.telemetry:
             self.telemetry.begin(name)
 
     def end_program(self, outcome="success"):
+        """Beendet den Programmlauf und sendet dessen Telemetrie.
+
+        :param outcome: Ergebnisbezeichnung des Programmlaufs.
+        """
         if self.telemetry:
             self.telemetry.finish_and_send(outcome)
         self.requested_stop = False
         self.previous_buttons = set(self.hub.buttons.pressed())
 
     def _telemetry_tick(self):
+        """Erfasst einen Telemetrie-Messpunkt, sofern Telemetrie aktiv ist."""
         if self.telemetry:
             self.telemetry.tick()
 
     def _telemetry_event(self, name, phase, value1=0, value2=0):
+        """Erfasst ein Telemetrie-Ereignis.
+
+        :param name: Name des Ereignisses.
+        :param phase: Numerische Ereignisphase.
+        :param value1: Erster Messwert.
+        :param value2: Zweiter Messwert.
+        """
         if self.telemetry:
             self.telemetry.event(name, phase, value1, value2)
 
     def should_stop(self):
+        """Gibt zurück, ob ein Programmabbruch angefordert wurde.
+
+        :return: ``True`` bei angefordertem Abbruch, sonst ``False``.
+        """
         return self.requested_stop
 
     def check_abort(self):
+        """Prüft die Mitteltaste und bricht den Programmlauf bei Bedarf ab.
+
+        :raises ProgramAborted: Wenn ein Abbruch angefordert wurde.
+        """
         buttons = set(self.hub.buttons.pressed())
         new_buttons = buttons - self.previous_buttons
         self.previous_buttons = buttons
@@ -74,6 +115,12 @@ class Robot:
             raise ProgramAborted()
 
     def wait(self, milliseconds, step=config.MOTION_POLL_MS):
+        """Wartet abbrechbar und aktualisiert währenddessen die Telemetrie.
+
+        :param milliseconds: Gesamte Wartezeit in Millisekunden.
+        :param step: Prüfintervall in Millisekunden.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        """
         self._telemetry_event("wait", 0, milliseconds)
         elapsed = 0
 
@@ -86,14 +133,15 @@ class Robot:
         self._telemetry_event("wait", 1, milliseconds)
 
     def stop_drive(self, include_motors=False):
+        """Stoppt die DriveBase und optional zusätzlich ihre Fahrmotoren.
+
+        :param include_motors: Stoppt bei ``True`` auch beide Fahrmotoren direkt.
+        """
         try:
             self.drive_base.stop()
         except Exception as error:
             print("STOP_ERROR drive_base", str(error))
 
-        # DriveBase owns its drive motors.  Sending a second stop command to
-        # the individual motors can race with the DriveBase controller.  Only
-        # use that fallback for the explicit emergency-stop path.
         if include_motors:
             for motor in self.drive_motors:
                 try:
@@ -111,16 +159,22 @@ class Robot:
                 print("BRAKE_ERROR drive_motor", str(error))
 
     def stop_attachment(self, motor):
+        """Stoppt einen Anbaumotor.
+
+        :param motor: Zu stoppender Pybricks-Motor.
+        """
         try:
             motor.stop()
         except Exception as error:
             print("STOP_ERROR attachment", str(error))
 
     def stop_attachments(self):
+        """Stoppt beide konfigurierten Anbaumotoren."""
         for motor in self.attachment_motors:
             self.stop_attachment(motor)
 
     def emergency_stop(self):
+        """Stoppt DriveBase, Fahrmotoren und Anbaumotoren sofort."""
         self.stop_drive(include_motors=True)
         self.stop_attachments()
 
@@ -131,6 +185,13 @@ class Robot:
         turn_rate=None,
         turn_acceleration=None,
     ):
+        """Ändert ausgewählte DriveBase-Einstellungen.
+
+        :param straight_speed: Geradeausgeschwindigkeit in Millimetern pro Sekunde.
+        :param straight_acceleration: Geradeausbeschleunigung in Millimetern pro Quadratsekunde.
+        :param turn_rate: Drehrate in Grad pro Sekunde.
+        :param turn_acceleration: Drehbeschleunigung in Grad pro Quadratsekunde.
+        """
         current = self.drive_base.settings()
 
         self.drive_base.settings(
@@ -142,10 +203,12 @@ class Robot:
         self._telemetry_event("settings", 1)
 
     def reset_drivebase_settings(self):
+        """Setzt die DriveBase auf die Standardwerte aus ``robot_config`` zurück."""
         self.drive_base.settings(*config.DEFAULT_DRIVEBASE_SETTINGS)
         self._configure_heading_tolerance()
 
     def _configure_heading_tolerance(self):
+        """Konfiguriert die zulässige Winkelabweichung der DriveBase."""
         try:
             speed_tolerance, _ = self.drive_base.heading_control.target_tolerances()
             self.drive_base.heading_control.target_tolerances(
@@ -153,18 +216,24 @@ class Robot:
                 config.TURN_POSITION_TOLERANCE_DEG,
             )
         except (AttributeError, OSError, TypeError) as error:
-            # Older firmware has no public DriveBase control tolerances.  Keep
-            # the robot usable, but make the missing accuracy feature visible.
             print("TURN_TOLERANCE_UNAVAILABLE", str(error))
 
     def set_gyro_use(self, value):
+        """Aktiviert oder deaktiviert die Gyro-Regelung der DriveBase.
+
+        :param value: ``True`` aktiviert die Gyro-Regelung.
+        """
         self.drive_base.use_gyro(value)
         if value:
             self._configure_heading_tolerance()
         self._telemetry_event("gyro", 1, 1 if value else 0)
 
     def reset_heading(self, angle=0):
-        """Setzt nur die Fahrtrichtung neu, nicht die gefahrene Strecke."""
+        """Setzt die Fahrtrichtung neu, ohne den Streckenzähler zu verändern.
+
+        :param angle: Neuer absoluter Richtungswert in Grad.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        """
         self.check_abort()
         distance = self.drive_base.distance()
         self.drive_base.reset(distance=distance, angle=angle)
@@ -177,7 +246,13 @@ class Robot:
         self.drive_base.reset(distance=distance, angle=angle)
 
     def straight_task(self, distance, then=Stop.HOLD, timeout_ms=None):
-        """Beschreibt eine Geradeausfahrt für ``multitask``."""
+        """Erstellt eine Geradeausaufgabe für ``multitask``.
+
+        :param distance: Relative Strecke in Millimetern.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: Aufgabenbeschreibung für ``multitask``.
+        """
         return ("straight", distance, then, timeout_ms)
 
     def motor_angle_task(
@@ -188,11 +263,26 @@ class Robot:
         then=Stop.HOLD,
         timeout_ms=None,
     ):
-        """Beschreibt eine Anbaubewegung für ``multitask``."""
+        """Erstellt eine Motorwinkelaufgabe für ``multitask``.
+
+        :param motor: Zu bewegender Anbaumotor.
+        :param speed: Motorgeschwindigkeit in Grad pro Sekunde.
+        :param angle: Relativer Motorwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: Aufgabenbeschreibung für ``multitask``.
+        """
         return ("motor_angle", motor, speed, angle, then, timeout_ms)
 
     def multitask(self, *tasks):
-        """Führt Geradeausfahrt und Anbaumotor-Bewegungen gleichzeitig aus."""
+        """Führt mehrere Fahr- und Motoraufgaben gleichzeitig aus.
+
+        :param tasks: Mit ``straight_task`` oder ``motor_angle_task`` erstellte Aufgaben.
+        :return: ``True`` nach erfolgreichem Abschluss aller Aufgaben.
+        :raises ValueError: Wenn eine Aufgabenbeschreibung ungültig ist.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn eine Aufgabe ihr Zeitlimit überschreitet.
+        """
         if not tasks:
             raise ValueError("multitask needs at least one task")
 
@@ -324,14 +414,21 @@ class Robot:
         min_progress=0,
         completion=None,
     ):
+        """Wartet überwacht auf den Abschluss einer asynchronen Bewegung.
+
+        :param done: Funktion, die den Abschlusszustand liefert.
+        :param timeout_ms: Maximale Dauer in Millisekunden.
+        :param action_name: Bewegungsname für Fehlermeldungen.
+        :param progress: Optionale Funktion zur Fortschrittsmessung.
+        :param min_progress: Mindestfortschritt zum Aktivieren der Abschlussprüfung.
+        :param completion: Optionale zusätzliche Abschlussprüfung.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         timer = StopWatch()
         armed = False
         saw_not_done = False
 
-        # Do not debounce completion.  HOLD can legitimately make done()
-        # oscillate.  Instead, arm the newly started command first, after
-        # observable progress or after a short fence plus a fresh not-done
-        # observation.
         while True:
             self.check_abort()
             self._telemetry_tick()
@@ -365,11 +462,17 @@ class Robot:
             wait(config.MOTION_POLL_MS)
 
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
+        """Fährt eine relative Strecke mit eigener Distanzüberwachung.
+
+        :param distance: Strecke in Millimetern; negative Werte fahren rückwärts.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
-        # reset() beendet den vorherigen Regler und setzt den aktuellen
-        # Gyro-Winkel sofort als neue Nullabweichung fuer diese Gerade. Weg und
-        # Winkelwerte bleiben dabei numerisch unveraendert.
         self._reset_drive_control()
         start_distance = self.drive_base.distance()
         target_distance = start_distance + distance
@@ -503,6 +606,17 @@ class Robot:
         absolute,
         target_angle,
     ):
+        """Führt einen überwachten Drehabschnitt bis zum Zielwinkel aus.
+
+        :param angle: An die DriveBase übergebener Drehwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss des Drehbefehls.
+        :param timeout_ms: Maximale Dauer in Millisekunden.
+        :param absolute: Verwendet bei ``True`` einen absoluten Drehbefehl.
+        :param target_angle: Zu überwachender absoluter Gyro-Zielwinkel.
+        :return: Quelle des erkannten Bewegungsabschlusses.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         self.stop_drive()
         start_angle = self.drive_base.angle()
         direction = 1 if target_angle >= start_angle else -1
@@ -613,6 +727,17 @@ class Robot:
         absolute=False,
         precise=True,
     ):
+        """Dreht relativ oder absolut mit Gyro-Zielmessung und Korrektur.
+
+        :param angle: Relativer Drehwinkel oder absoluter Zielwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss einer unpräzisen Drehung.
+        :param timeout_ms: Maximale Dauer der Hauptdrehung in Millisekunden.
+        :param absolute: Interpretiert ``angle`` bei ``True`` als absoluten Zielwinkel.
+        :param precise: Aktiviert Bremsvorhalt, Zielprüfung und Korrektur.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
+        """
         self.check_abort()
         self._telemetry_event("turn", 0, angle)
         self.stop_drive()
@@ -633,8 +758,6 @@ class Robot:
             turn_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
-            # Die Vorsteuerung sorgt nur dafuer, dass die schnelle Bewegung
-            # sicher durch das Ziel laeuft. _turn_once bremst bereits dort ab.
             turn_then = Stop.BRAKE if precise else then
             if precise:
                 delta = target_angle - start_angle
@@ -661,8 +784,6 @@ class Robot:
             )
 
             if precise:
-                # Stop.BRAKE aktiv lassen. stop_drive() an dieser Stelle
-                # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
                 error = target_angle - self.drive_base.angle()
                 for attempt in range(config.TURN_CORRECTION_ATTEMPTS):
@@ -728,7 +849,16 @@ class Robot:
         return True
 
     def turn_to(self, heading, then=Stop.HOLD, timeout_ms=None, precise=True):
-        """Turns to an absolute gyro heading when supported by the firmware."""
+        """Dreht auf einen absoluten Gyro-Zielwinkel.
+
+        :param heading: Absoluter Zielwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss einer unpräzisen Drehung.
+        :param timeout_ms: Maximale Dauer der Hauptdrehung in Millisekunden.
+        :param precise: Aktiviert Bremsvorhalt, Zielprüfung und Korrektur.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
+        """
         return self.turn(
             heading,
             then=then,
@@ -745,6 +875,18 @@ class Robot:
         then=Stop.HOLD,
         timeout_ms=None,
     ):
+        """Fährt einen Kreisbogen mit Winkel- oder Streckenziel.
+
+        :param radius: Kurvenradius in Millimetern.
+        :param angle: Optionaler relativer Bogenwinkel in Grad.
+        :param distance: Optionale relative Bogenstrecke in Millimetern.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ValueError: Wenn kein oder mehr als ein Ziel angegeben wurde.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         if angle is None and distance is None:
             raise ValueError("arc needs angle or distance")
         if angle is not None and distance is not None:
@@ -786,6 +928,12 @@ class Robot:
         return True
 
     def drive(self, speed, turn_rate=0):
+        """Fährt kontinuierlich bis zum Programmabbruch.
+
+        :param speed: Fahrgeschwindigkeit in Millimetern pro Sekunde.
+        :param turn_rate: Drehrate in Grad pro Sekunde.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        """
         self.check_abort()
         self._telemetry_event("drive", 0, speed, turn_rate)
         self.stop_drive()
@@ -801,6 +949,17 @@ class Robot:
             self._telemetry_event("drive", 2, speed, turn_rate)
 
     def motor_angle(self, motor, speed, angle, then=Stop.HOLD, timeout_ms=None):
+        """Bewegt einen Motor um einen relativen Winkel.
+
+        :param motor: Zu bewegender Pybricks-Motor.
+        :param speed: Motorgeschwindigkeit in Grad pro Sekunde.
+        :param angle: Relativer Motorwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         self.check_abort()
         self._telemetry_event("motor_angle", 0, speed, angle)
         start_angle = motor.angle()
@@ -815,6 +974,17 @@ class Robot:
         return result
 
     def motor_target(self, motor, speed, target, then=Stop.HOLD, timeout_ms=None):
+        """Bewegt einen Motor auf einen absoluten Zielwinkel.
+
+        :param motor: Zu bewegender Pybricks-Motor.
+        :param speed: Maximale Motorgeschwindigkeit in Grad pro Sekunde.
+        :param target: Absoluter Motorzielwinkel in Grad.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         self.check_abort()
         self._telemetry_event("motor_target", 0, speed, target)
         start_angle = motor.angle()
@@ -829,6 +999,17 @@ class Robot:
         return result
 
     def motor_time(self, motor, speed, time, then=Stop.HOLD, timeout_ms=None):
+        """Lässt einen Motor für eine festgelegte Dauer laufen.
+
+        :param motor: Zu bewegender Pybricks-Motor.
+        :param speed: Motorgeschwindigkeit in Grad pro Sekunde.
+        :param time: Laufzeit in Millisekunden.
+        :param then: Motorverhalten nach Abschluss der Bewegung.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         self.check_abort()
         self._telemetry_event("motor_time", 0, speed, time)
         start_angle = motor.angle()
@@ -847,6 +1028,16 @@ class Robot:
         return result
 
     def _wait_for_motor(self, motor, action_name, timeout_ms, start_angle=None):
+        """Wartet überwacht auf den Abschluss einer Motorbewegung.
+
+        :param motor: Überwachter Pybricks-Motor.
+        :param action_name: Bewegungsname für Fehlermeldungen.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :param start_angle: Optionaler Startwinkel zur Fortschrittsmessung.
+        :return: ``True`` nach erfolgreichem Abschluss.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        """
         if timeout_ms is None:
             timeout_ms = config.MOTOR_TIMEOUT_MS
 
@@ -879,6 +1070,17 @@ class Robot:
         then=Stop.COAST,
         timeout_ms=None,
     ):
+        """Bewegt einen Motor bis zur Blockade oder zum Zeitlimit.
+
+        :param motor: Zu bewegender Pybricks-Motor.
+        :param speed: Motorgeschwindigkeit in Grad pro Sekunde.
+        :param then: Motorverhalten nach erkannter Blockade.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
+        :return: Motorwinkel beim erkannten Stillstand.
+        :raises ValueError: Wenn ``speed`` gleich null ist.
+        :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
+        :raises MotionTimeout: Wenn keine Blockade innerhalb des Zeitlimits erkannt wird.
+        """
         if speed == 0:
             raise ValueError("motor_until_stalled needs a non-zero speed")
 
@@ -906,12 +1108,10 @@ class Robot:
                 self._telemetry_tick()
                 now = timer.time()
 
-                # pybricks stall status prüfen
                 if motor.stalled():
                     stall_reason = "pybricks"
                     break
 
-                # stall fallback über encoder fortschritt
                 if now - progress_window_started >= config.STALL_PROGRESS_WINDOW_MS:
                     progress = (motor.angle() - progress_window_angle) * direction
 
