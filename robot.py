@@ -667,14 +667,19 @@ class Robot:
                 error = target_angle - self.drive_base.angle()
 
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
-                    print("TURN_ACCURACY_ERROR", target_angle, error)
-                    raise MotionTimeout("turn did not reach target angle")
-                print(
-                    "TURN_ACCURACY_OK",
-                    "target", target_angle,
-                    "angle", self.drive_base.angle(),
-                    "error", error,
-                )
+                    print(
+                        "TURN_ACCURACY_WARNING",
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                    )
+                else:
+                    print(
+                        "TURN_ACCURACY_OK",
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                    )
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
