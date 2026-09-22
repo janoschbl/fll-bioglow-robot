@@ -535,16 +535,11 @@ class Robot:
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
             # Der reale Antrieb verliert beim Abbremsen etwa sechs Grad. Die
-            # Vorsteuerung erledigt das in derselben schnellen Bewegung.
+            # winkelabhaengige Vorsteuerung erledigt das in derselben Bewegung.
             turn_then = Stop.BRAKE if precise else then
             if precise:
                 delta = target_angle - start_angle
-                if delta > 0:
-                    compensation = config.TURN_COMPENSATION_DEG
-                elif delta < 0:
-                    compensation = -config.TURN_COMPENSATION_DEG
-                else:
-                    compensation = 0
+                compensation = self._turn_compensation(delta)
                 commanded_angle = (
                     target_angle + compensation
                     if absolute
@@ -566,9 +561,36 @@ class Robot:
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
                 error = target_angle - self.drive_base.angle()
-                if abs(error) > config.TURN_CORRECTION_THRESHOLD_DEG:
-                    self._correct_turn_target(target_angle)
+                for attempt in range(config.TURN_CORRECTION_ATTEMPTS):
+                    if abs(error) <= config.TURN_CORRECTION_THRESHOLD_DEG:
+                        break
+                    compensation = self._turn_compensation(error)
+                    correction = error + compensation
+                    print(
+                        "TURN_CORRECTION_START",
+                        "attempt", attempt + 1,
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                        "compensation", compensation,
+                        "command", correction,
+                    )
+                    self._turn_once(
+                        correction,
+                        Stop.BRAKE,
+                        config.TURN_CORRECTION_TIMEOUT_MS,
+                        False,
+                        target_angle,
+                    )
+                    self.wait(config.TURN_BRAKE_SETTLE_MS)
                     error = target_angle - self.drive_base.angle()
+                    print(
+                        "TURN_CORRECTION_RESULT",
+                        "attempt", attempt + 1,
+                        "target", target_angle,
+                        "angle", self.drive_base.angle(),
+                        "error", error,
+                    )
 
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
                     print("TURN_ACCURACY_ERROR", target_angle, error)
@@ -592,94 +614,15 @@ class Robot:
         self._telemetry_event("turn", 1, angle)
         return True
 
-    def _correct_turn_target(self, target_angle):
-        """Regelt einen kleinen Restfehler aktiv gegen die Reifenhaftung aus."""
-        timer = StopWatch()
-        target_since = None
-        next_log = 0
-
-        print(
-            "TURN_CORRECTION_START",
-            "target", target_angle,
-            "angle", self.drive_base.angle(),
-            "timeout_ms", config.TURN_CORRECTION_TIMEOUT_MS,
+    def _turn_compensation(self, delta):
+        if delta == 0:
+            return 0
+        amount = (
+            config.TURN_LARGE_COMPENSATION_DEG
+            if abs(delta) >= config.TURN_LARGE_ANGLE_THRESHOLD_DEG
+            else config.TURN_COMPENSATION_DEG
         )
-
-        try:
-            while True:
-                self.check_abort()
-                self._telemetry_tick()
-
-                elapsed = timer.time()
-                current_angle = self.drive_base.angle()
-                error = target_angle - current_angle
-
-                if abs(error) <= config.TURN_COMPLETION_TOLERANCE_DEG:
-                    # drive(0, 0) bremst den laufenden Geschwindigkeitsregler
-                    # aktiv ab. stop() wuerde lediglich ausrollen lassen.
-                    self.drive_base.drive(0, 0)
-                    if target_since is None:
-                        target_since = elapsed
-                        print(
-                            "TURN_CORRECTION_TARGET_ENTER",
-                            "ms", elapsed,
-                            "angle", current_angle,
-                            "error", error,
-                        )
-                    elif elapsed - target_since >= config.TURN_CORRECTION_SETTLE_MS:
-                        self.stop_drive()
-                        print(
-                            "TURN_CORRECTION_DONE",
-                            "ms", elapsed,
-                            "angle", current_angle,
-                            "error", error,
-                            "stable_ms", elapsed - target_since,
-                        )
-                        return
-                else:
-                    if target_since is not None:
-                        print(
-                            "TURN_CORRECTION_TARGET_LEFT",
-                            "ms", elapsed,
-                            "angle", current_angle,
-                            "error", error,
-                        )
-                        target_since = None
-
-                    rate = abs(error) * config.TURN_CORRECTION_GAIN
-                    rate = max(
-                        config.TURN_CORRECTION_MIN_RATE,
-                        min(config.TURN_CORRECTION_MAX_RATE, rate),
-                    )
-                    if error < 0:
-                        rate = -rate
-                    self.drive_base.drive(0, rate)
-
-                if elapsed >= next_log:
-                    print(
-                        "TURN_CORRECTION_STATUS",
-                        "ms", elapsed,
-                        "angle", current_angle,
-                        "target", target_angle,
-                        "error", error,
-                        "rate", 0 if target_since is not None else rate,
-                    )
-                    next_log = elapsed + config.TURN_LOG_INTERVAL_MS
-
-                if elapsed >= config.TURN_CORRECTION_TIMEOUT_MS:
-                    print(
-                        "TURN_CORRECTION_TIMEOUT",
-                        "ms", elapsed,
-                        "angle", current_angle,
-                        "target", target_angle,
-                        "error", error,
-                    )
-                    raise MotionTimeout("turn correction timed out")
-
-                wait(config.MOTION_POLL_MS)
-        except Exception:
-            self.stop_drive()
-            raise
+        return amount if delta > 0 else -amount
 
     def turn_to(self, heading, then=Stop.HOLD, timeout_ms=None, precise=True):
         """Turns to an absolute gyro heading when supported by the firmware."""
