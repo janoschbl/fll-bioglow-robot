@@ -566,7 +566,7 @@ class Robot:
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
                 error = target_angle - self.drive_base.angle()
-                if abs(error) >= config.TURN_CORRECTION_THRESHOLD_DEG:
+                if abs(error) > config.TURN_CORRECTION_THRESHOLD_DEG:
                     # Hoechstens eine kurze Korrektur auf den echten
                     # Zielwinkel. Hier keine Vorsteuerung mehr addieren.
                     self._turn_once(
