@@ -20,14 +20,14 @@ RECHTER_ANTRIEB = Port.D
 LINKS_RICHTUNG = Direction.COUNTERCLOCKWISE
 RECHTS_RICHTUNG = Direction.CLOCKWISE
 
-TEST_WINKEL = (85, -85, 135, -135)
-WIEDERHOLUNGEN = 3
+TEST_WINKEL = (33, -33, 47, -47)
+TEST_MAX_RATEN = (45, 70, 90, 120)
+WIEDERHOLUNGEN = 2
 
 REGEL_INTERVALL_MS = 10
 REGEL_TIMEOUT_MS = 8000
 REGEL_KP = 2.0
 REGEL_MIN_RATE = 14
-REGEL_MAX_RATE = 90
 REGEL_NAH_MAX_RATE = 28
 REGEL_NAH_GRENZE_DEG = 5
 ZIEL_TOLERANZ_DEG = 0.75
@@ -65,6 +65,7 @@ def genaue_drehung(
     linker_motor,
     rechter_motor,
     ziel,
+    max_rate,
 ):
     """Regelt auf einen absoluten DriveBase-Winkel, ohne ``done()``."""
     uhr = StopWatch()
@@ -102,7 +103,7 @@ def genaue_drehung(
             maximum = (
                 REGEL_NAH_MAX_RATE
                 if abs(fehler) <= REGEL_NAH_GRENZE_DEG
-                else REGEL_MAX_RATE
+                else max_rate
             )
             befehl = _begrenzen(
                 abs(fehler) * REGEL_KP,
@@ -117,7 +118,8 @@ def genaue_drehung(
 
         if jetzt >= naechster_trace:
             print(
-                "CAL_TRACE,{},{:.3f},{:.3f},{:.3f},{:.3f}".format(
+                "CAL_TRACE,{},{},{:.3f},{:.3f},{:.3f},{:.3f}".format(
+                    max_rate,
                     ziel,
                     winkel,
                     fehler,
@@ -149,51 +151,84 @@ def kalibrieren(hub, drive_base, linker_motor, rechter_motor):
     drive_base.use_gyro(True)
     print("CAL_BEGIN")
     print(
-        "CAL_FIELDS,wiederholung,ziel_deg,"
+        "CAL_FIELDS,max_rate,wiederholung,ziel_deg,"
         "endwinkel_deg,fehler_deg,dauer_ms,"
         "ruhe_drehrate_deg_s,bestanden"
     )
 
     bestanden = 0
     gesamt = 0
+    statistik = {}
 
-    for wiederholung in range(1, WIEDERHOLUNGEN + 1):
-        for ziel in TEST_WINKEL:
-            _abbruch_pruefen(hub)
-            drive_base.reset(distance=drive_base.distance(), angle=0)
-            wait(MESS_PAUSE_MS)
+    for max_rate in TEST_MAX_RATEN:
+        statistik[max_rate] = [0, 0, 0, 0]
 
-            dauer = genaue_drehung(
-                hub,
-                drive_base,
-                linker_motor,
-                rechter_motor,
-                ziel,
-            )
-            wait(MESS_PAUSE_MS)
+        for wiederholung in range(1, WIEDERHOLUNGEN + 1):
+            for ziel in TEST_WINKEL:
+                _abbruch_pruefen(hub)
+                drive_base.reset(distance=drive_base.distance(), angle=0)
+                wait(MESS_PAUSE_MS)
 
-            endwinkel = drive_base.angle()
-            fehler = ziel - endwinkel
-            ruhe_drehrate = _drehrate(hub)
-            ist_bestanden = abs(fehler) < 2
-            gesamt += 1
-            if ist_bestanden:
-                bestanden += 1
-
-            print(
-                "CAL_RESULT,{},{},{:.3f},{:.3f},{},{:.3f},{}".format(
-                    wiederholung,
+                dauer = genaue_drehung(
+                    hub,
+                    drive_base,
+                    linker_motor,
+                    rechter_motor,
                     ziel,
-                    endwinkel,
-                    fehler,
-                    dauer,
-                    ruhe_drehrate,
-                    1 if ist_bestanden else 0,
+                    max_rate,
                 )
+                wait(MESS_PAUSE_MS)
+
+                endwinkel = drive_base.angle()
+                fehler = ziel - endwinkel
+                ruhe_drehrate = _drehrate(hub)
+                ist_bestanden = abs(fehler) < 2
+                gesamt += 1
+                if ist_bestanden:
+                    bestanden += 1
+
+                profil = statistik[max_rate]
+                profil[0] += 1 if ist_bestanden else 0
+                profil[1] += 1
+                profil[2] += dauer
+                profil[3] = max(profil[3], abs(fehler))
+
+                print(
+                    "CAL_RESULT,{},{},{},{:.3f},{:.3f},{},{:.3f},{}".format(
+                        max_rate,
+                        wiederholung,
+                        ziel,
+                        endwinkel,
+                        fehler,
+                        dauer,
+                        ruhe_drehrate,
+                        1 if ist_bestanden else 0,
+                    )
+                )
+
+    beste_rate = None
+    beste_dauer = None
+    for max_rate in TEST_MAX_RATEN:
+        profil = statistik[max_rate]
+        mittlere_dauer = profil[2] / profil[1]
+        print(
+            "CAL_PROFILE,{},{},{},{:.1f},{:.3f}".format(
+                max_rate,
+                profil[0],
+                profil[1],
+                mittlere_dauer,
+                profil[3],
             )
+        )
+        if profil[0] == profil[1] and (
+            beste_dauer is None or mittlere_dauer < beste_dauer
+        ):
+            beste_rate = max_rate
+            beste_dauer = mittlere_dauer
 
     _antrieb_bremsen(drive_base, linker_motor, rechter_motor)
     print("CAL_SUMMARY,{},{},{}".format(bestanden, gesamt, gesamt - bestanden))
+    print("CAL_BEST,{},{}".format(beste_rate, beste_dauer))
     print("CAL_END")
 
 
