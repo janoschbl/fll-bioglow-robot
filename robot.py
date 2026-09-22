@@ -383,39 +383,23 @@ class Robot:
 
     def _turn_once(self, angle, then, timeout_ms, absolute):
         self.stop_drive()
+        start_angle = self.drive_base.angle()
 
         if absolute:
             self.drive_base.turn(angle, then=then, wait=False, absolute=True)
         else:
             self.drive_base.turn(angle, then=then, wait=False)
 
-        start_angle = self.drive_base.angle()
-        timer = StopWatch()
-        armed = False
-        done_since = None
-
-        while True:
-            self.check_abort()
-            self._telemetry_tick()
-
-            now = timer.time()
-            done_state = self.drive_base.done()
-            progress = abs(self.drive_base.angle() - start_angle)
-            if progress >= config.MOTION_MIN_PROGRESS_DEG or not done_state:
-                armed = True
-
-            if armed and done_state:
-                if done_since is None:
-                    done_since = now
-                elif now - done_since >= config.TURN_DONE_STABLE_MS:
-                    return
-            else:
-                done_since = None
-
-            if now >= timeout_ms:
-                raise MotionTimeout("turn timed out")
-
-            wait(config.MOTION_POLL_MS)
+        # Ein einziges frisches done() beendet den Durchlauf. Mehrere
+        # aufeinanderfolgende True-Werte zu verlangen kann bei aktiver
+        # Regelung endlos zwischen True und False pendeln.
+        self._wait_until_done(
+            self.drive_base.done,
+            timeout_ms,
+            "turn",
+            progress=lambda: abs(self.drive_base.angle() - start_angle),
+            min_progress=config.MOTION_MIN_PROGRESS_DEG,
+        )
 
     def turn(
         self,
@@ -436,7 +420,6 @@ class Robot:
             turn_timeout = (
                 config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
             )
-            total_timer = StopWatch()
             # Der reale Antrieb verliert beim Abbremsen etwa sechs Grad. Die
             # Vorsteuerung erledigt das in derselben schnellen Bewegung.
             turn_then = Stop.BRAKE if precise else then
@@ -453,11 +436,6 @@ class Robot:
                     if absolute
                     else angle + compensation
                 )
-                turn_timeout = min(
-                    turn_timeout,
-                    config.TURN_TOTAL_TIMEOUT_MS
-                    - config.TURN_BRAKE_SETTLE_MS,
-                )
             else:
                 commanded_angle = angle
 
@@ -472,11 +450,21 @@ class Robot:
                 # Stop.BRAKE aktiv lassen. stop_drive() an dieser Stelle
                 # wuerde die Bremsung aufheben und mehrere Grad unterdrehen.
                 self.wait(config.TURN_BRAKE_SETTLE_MS)
-                if total_timer.time() >= config.TURN_TOTAL_TIMEOUT_MS:
-                    raise MotionTimeout("turn exceeded 1500 ms")
                 error = target_angle - self.drive_base.angle()
                 if abs(error) >= config.TURN_CORRECTION_THRESHOLD_DEG:
-                    print("TURN_ACCURACY_WARNING", target_angle, error)
+                    # Hoechstens eine kurze Korrektur auf den echten
+                    # Zielwinkel. Hier keine Vorsteuerung mehr addieren.
+                    self._turn_once(
+                        target_angle if absolute else error,
+                        then,
+                        turn_timeout,
+                        absolute,
+                    )
+                    error = target_angle - self.drive_base.angle()
+
+                if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
+                    print("TURN_ACCURACY_ERROR", target_angle, error)
+                    raise MotionTimeout("turn did not reach target angle")
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)

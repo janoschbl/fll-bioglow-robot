@@ -195,6 +195,41 @@ class RobotTest(unittest.TestCase):
         self.assertLess(abs(85 - drive_base.angle()), 2)
         self.assertLess(FakeStopWatch.now, 1500)
 
+    def test_turn_uses_one_correction_to_reach_target_angle(self):
+        class CorrectableDriveBase(FakeDriveBase):
+            def __init__(self):
+                super().__init__()
+                self.turn_calls = []
+
+            def turn(self, angle, then, wait, absolute=False):
+                self.turn_calls.append(angle)
+                if len(self.turn_calls) == 1:
+                    self.current_angle += angle - 9
+                else:
+                    self.current_angle += angle
+
+        drive_base = CorrectableDriveBase()
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(85)
+
+        self.assertEqual(drive_base.turn_calls, [91, 3])
+        self.assertEqual(drive_base.angle(), 85)
+
+    def test_large_turn_waits_until_drivebase_reports_done(self):
+        class SlowLargeTurnDriveBase(FakeDriveBase):
+            def done(self):
+                self.done_checks += 1
+                return FakeStopWatch.now >= 2000
+
+        drive_base = SlowLargeTurnDriveBase()
+        drive_base.drive_settings = (450, 700, 100, 300)
+        robot, _, _ = make_robot(drive_base=drive_base)
+
+        robot.turn(180)
+
+        self.assertGreaterEqual(FakeStopWatch.now, 2000)
+
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()
 
