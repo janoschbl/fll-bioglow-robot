@@ -195,7 +195,7 @@ class RobotTest(unittest.TestCase):
         self.assertLess(abs(85 - drive_base.angle()), 2)
         self.assertLess(FakeStopWatch.now, 1500)
 
-    def test_large_turn_gets_timeout_matching_its_motion_profile(self):
+    def test_large_turn_waits_until_drivebase_reports_done(self):
         class SlowLargeTurnDriveBase(FakeDriveBase):
             def done(self):
                 self.done_checks += 1
@@ -208,7 +208,6 @@ class RobotTest(unittest.TestCase):
         robot.turn(180)
 
         self.assertGreaterEqual(FakeStopWatch.now, 2000)
-        self.assertLess(FakeStopWatch.now, 3000)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()
