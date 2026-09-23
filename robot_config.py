@@ -47,6 +47,18 @@ TURN_COMPENSATION_DEG = 6
 TURN_BRAKE_SETTLE_MS = 120
 TURN_LOG_INTERVAL_MS = 250
 
+# Ein-Pass-Drehung; Startwerte auf der Wettkampfmatte prüfen.
+SMOOTH_TURN_MAX_RATE = 160       # Grad pro Sekunde
+SMOOTH_TURN_MIN_RATE = 28        # kleinste zuverlässige Dauerdrehung
+SMOOTH_TURN_DECEL = 450         # Grad pro Sekunde zum Abbremsen
+SMOOTH_TURN_STOP_DELAY_MS = 20  # Reaktionszeit und passives Bremsen
+SMOOTH_TURN_STOP_OFFSET_DEG = 0.35
+SMOOTH_TURN_SETTLE_MS = 90
+SMOOTH_TURN_ACCEPT_DEG = 1.0
+SMOOTH_TURN_STALL_MS = 600       # Zeit ohne messbaren Drehfortschritt
+SMOOTH_TURN_STALL_PROGRESS_DEG = 0.5
+SMOOTH_TURN_DEBUG = False
+
 STALL_TIMEOUT_MS = 6000
 STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3

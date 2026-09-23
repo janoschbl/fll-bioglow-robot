@@ -130,6 +130,54 @@ class FakeControl:
         return self.tolerances
 
 
+class SimulatedTurnDriveBase(FakeDriveBase):
+    """Simuliert eine stetige Drehung mit passivem Bremsweg."""
+
+    def __init__(self, brake_decel=600):
+        super().__init__()
+        self.last_ms = FakeStopWatch.now
+        self.rate = 0
+        self.requested_rate = 0
+        self.brake_decel = brake_decel
+        self.command_rates = []
+        self.brake_count = 0
+        self.braking = True
+
+    def _advance(self):
+        while self.last_ms < FakeStopWatch.now:
+            step = min(10, FakeStopWatch.now - self.last_ms) / 1000
+            if self.braking:
+                reduction = self.brake_decel * step
+                if self.rate > 0:
+                    self.rate = max(0, self.rate - reduction)
+                else:
+                    self.rate = min(0, self.rate + reduction)
+            else:
+                change = max(-900 * step, min(900 * step,
+                                                self.requested_rate - self.rate))
+                self.rate += change
+            self.current_angle += self.rate * step
+            self.last_ms += step * 1000
+
+    def angle(self):
+        self._advance()
+        return self.current_angle
+
+    def state(self):
+        return (0, 0, self.angle(), self.rate)
+
+    def drive(self, speed, turn_rate):
+        self._advance()
+        self.braking = False
+        self.requested_rate = turn_rate
+        self.command_rates.append(turn_rate)
+
+    def brake(self):
+        self._advance()
+        self.braking = True
+        self.brake_count += 1
+
+
 def make_robot(drive_base=None, attachment=None):
     drive_base = drive_base or FakeDriveBase()
     attachment = attachment or FakeMotor()
@@ -211,88 +259,53 @@ class RobotTest(unittest.TestCase):
         self.assertEqual(drive_base.started, (85, "hold", False, True))
         self.assertEqual(drive_base.angle(), 85)
 
-    def test_turn_compensates_an_inaccurate_completed_motion(self):
-        class InaccurateDriveBase(FakeDriveBase):
-            def turn(self, angle, then, wait, absolute=False):
-                self.started = (angle, then, wait, absolute)
-                self.current_angle = angle - 5
+    def test_smooth_turns_in_one_direction_and_brakes_once(self):
+        for target in (20, 110, 180, -115, -180):
+            with self.subTest(target=target):
+                FakeStopWatch.now = 0
+                drive_base = SimulatedTurnDriveBase()
+                robot, _, _ = make_robot(drive_base=drive_base)
 
-        drive_base = InaccurateDriveBase()
+                robot.turn(target)
+
+                self.assertLess(abs(drive_base.angle() - target), 1)
+                self.assertLess(FakeStopWatch.now, 3000)
+                self.assertTrue(all(rate * target > 0 for rate in drive_base.command_rates))
+                self.assertEqual(drive_base.brake_count, 2)
+
+    def test_smooth_absolute_turn_from_existing_heading(self):
+        drive_base = SimulatedTurnDriveBase()
+        drive_base.current_angle = 40
         robot, _, _ = make_robot(drive_base=drive_base)
 
-        robot.turn(85, absolute=True)
+        robot.turn_to(180)
 
-        self.assertEqual(drive_base.started, (91, "brake", False, True))
-        self.assertLess(abs(85 - drive_base.angle()), 2)
-        self.assertLess(FakeStopWatch.now, 1500)
+        self.assertLess(abs(drive_base.angle() - 180), 1)
 
-    def test_turn_corrects_when_done_is_early(self):
-        class TireLimitedDriveBase(FakeDriveBase):
-            def __init__(self):
-                super().__init__()
-                self.turn_calls = []
+    def test_smooth_turn_with_different_braking_strength(self):
+        for brake_decel in (300, 600, 1200):
+            with self.subTest(brake_decel=brake_decel):
+                FakeStopWatch.now = 0
+                drive_base = SimulatedTurnDriveBase(brake_decel)
+                robot, _, _ = make_robot(drive_base=drive_base)
 
-            def turn(self, angle, then, wait, absolute=False):
-                self.turn_calls.append(angle)
-                self.started = (angle, then, wait, absolute)
-                loss = 9 if len(self.turn_calls) == 1 else 6
-                self.current_angle += angle - loss
+                robot.turn(180)
 
-        drive_base = TireLimitedDriveBase()
+                self.assertLess(abs(drive_base.angle() - 180), 1)
+
+    def test_smooth_turn_exits_on_no_progress(self):
+        class BlockedTurnDriveBase(SimulatedTurnDriveBase):
+            def drive(self, speed, turn_rate):
+                self.command_rates.append(turn_rate)
+
+        drive_base = BlockedTurnDriveBase()
         robot, _, _ = make_robot(drive_base=drive_base)
 
-        result = robot.turn(85)
+        with self.assertRaises(MotionTimeout):
+            robot.turn(180)
 
-        self.assertTrue(result)
-        self.assertEqual(drive_base.turn_calls, [91, 9])
-        self.assertEqual(drive_base.angle(), 85)
-
-    def test_turn_brakes_during_single_motion_at_measured_target(self):
-        class CrossingDriveBase(FakeDriveBase):
-            def __init__(self):
-                super().__init__(done_after=1000)
-                self.turn_calls = []
-                self.command_target = 0
-
-            def turn(self, angle, then, wait, absolute=False):
-                self.turn_calls.append(angle)
-                self.command_target = angle
-
-            def done(self):
-                self.done_checks += 1
-                self.current_angle = min(self.command_target, self.current_angle + 0.5)
-                return False
-
-        drive_base = CrossingDriveBase()
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        robot.turn(85)
-
-        self.assertEqual(drive_base.turn_calls, [91])
-        self.assertLessEqual(abs(drive_base.angle() - 85), 1)
-        self.assertTrue(drive_base.stopped)
-
-    def test_negative_turn_uses_same_early_brake(self):
-        class CrossingDriveBase(FakeDriveBase):
-            def __init__(self):
-                super().__init__(done_after=1000)
-                self.command_target = 0
-
-            def turn(self, angle, then, wait, absolute=False):
-                self.command_target = angle
-
-            def done(self):
-                self.done_checks += 1
-                self.current_angle = max(self.command_target, self.current_angle - 0.5)
-                return False
-
-        drive_base = CrossingDriveBase()
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        robot.turn(-85)
-
-        self.assertLessEqual(abs(drive_base.angle() + 85), 1)
-        self.assertTrue(drive_base.stopped)
+        self.assertLess(FakeStopWatch.now, 1000)
+        self.assertTrue(drive_base.braking)
 
     def test_large_turn_finishes_at_measured_target_before_done(self):
         class SlowLargeTurnDriveBase(FakeDriveBase):
@@ -308,26 +321,6 @@ class RobotTest(unittest.TestCase):
 
         self.assertEqual(FakeStopWatch.now, 0)
         self.assertLess(FakeStopWatch.now, 2000)
-
-    def test_precise_180_turn_finishes_at_stable_gyro_target(self):
-        class StuckDoneAtTargetDriveBase(FakeDriveBase):
-            def done(self):
-                self.done_checks += 1
-                return False
-
-            def turn(self, angle, then, wait, absolute=False):
-                self.started = (angle, then, wait, absolute)
-                self.current_angle = 180
-
-        drive_base = StuckDoneAtTargetDriveBase()
-        robot, _, _ = make_robot(drive_base=drive_base)
-
-        robot.turn(180)
-
-        self.assertEqual(drive_base.started, (186, "brake", False, False))
-        self.assertEqual(drive_base.angle(), 180)
-        self.assertTrue(drive_base.stopped)
-        self.assertLess(FakeStopWatch.now, 1000)
 
     def test_reset_settings_tightens_heading_position_tolerance(self):
         robot, drive_base, _ = make_robot()

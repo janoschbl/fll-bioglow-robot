@@ -719,6 +719,78 @@ class Robot:
 
             wait(config.MOTION_POLL_MS)
 
+    def _turn_one_pass(self, angle, absolute, timeout_ms):
+        """Dreht einmalig mit Gyro-Rückmeldung und angepasstem Geschwindigkeitsprofil."""
+        self.check_abort()
+        self.drive_base.brake()
+        start = self.drive_base.angle()
+        target = angle if absolute else start + angle
+        delta = target - start
+        if abs(delta) <= config.SMOOTH_TURN_ACCEPT_DEG:
+            return True
+
+        direction = 1 if delta > 0 else -1
+        limit_ms = config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
+        timer = StopWatch()
+        last_progress_ms = 0
+        last_angle = start
+        next_log_ms = 0
+        self._telemetry_event("turn", 0, angle)
+        print("SMOOTH_TURN_START", "start", start, "target", target,
+              "max_rate", config.SMOOTH_TURN_MAX_RATE)
+
+        try:
+            while True:
+                self.check_abort()
+                self._telemetry_tick()
+                now = timer.time()
+                state = self.drive_base.state()
+                heading = self.drive_base.angle()
+                rate = state[3] * direction
+                remaining = (target - heading) * direction
+
+                if abs(heading - last_angle) >= config.SMOOTH_TURN_STALL_PROGRESS_DEG:
+                    last_angle = heading
+                    last_progress_ms = now
+
+                # Bei kleiner Drehrate den Bremsweg vor dem Ziel einplanen.
+                stop_lead = (config.SMOOTH_TURN_STOP_OFFSET_DEG
+                             + max(0, rate) * config.SMOOTH_TURN_STOP_DELAY_MS / 1000)
+                if remaining <= stop_lead:
+                    self.drive_base.brake()
+                    self.wait(config.SMOOTH_TURN_SETTLE_MS)
+                    final = self.drive_base.angle()
+                    error = target - final
+                    print("SMOOTH_TURN_DONE", "ms", timer.time(),
+                          "target", target, "final", final, "error", error,
+                          "stop_rate", rate)
+                    if abs(error) > config.SMOOTH_TURN_ACCEPT_DEG:
+                        print("SMOOTH_TURN_ACCURACY_WARNING", error)
+                    self._telemetry_event("turn", 1, angle)
+                    return True
+
+                if now >= limit_ms:
+                    raise MotionTimeout("smooth turn timed out")
+                if now - last_progress_ms >= config.SMOOTH_TURN_STALL_MS:
+                    raise MotionTimeout("smooth turn made no progress")
+
+                approach = remaining - stop_lead
+                profile_rate = (2 * config.SMOOTH_TURN_DECEL * approach) ** 0.5
+                command_rate = min(config.SMOOTH_TURN_MAX_RATE,
+                                   max(config.SMOOTH_TURN_MIN_RATE, profile_rate))
+                self.drive_base.drive(0, direction * command_rate)
+
+                if config.SMOOTH_TURN_DEBUG and now >= next_log_ms:
+                    print("SMOOTH_TURN_STATUS", "ms", now, "heading", heading,
+                          "remaining", remaining, "rate", rate,
+                          "command_rate", command_rate)
+                    next_log_ms = now + config.TURN_LOG_INTERVAL_MS
+                wait(config.MOTION_POLL_MS)
+        except Exception:
+            self.drive_base.brake()
+            self._telemetry_event("turn", 2, angle)
+            raise
+
     def turn(
         self,
         angle,
@@ -727,17 +799,20 @@ class Robot:
         absolute=False,
         precise=True,
     ):
-        """Dreht relativ oder absolut mit Gyro-Zielmessung und Korrektur.
+        """Dreht relativ oder absolut mit einem geregelten Ein-Pass-Profil.
 
         :param angle: Relativer Drehwinkel oder absoluter Zielwinkel in Grad.
         :param then: Motorverhalten nach Abschluss einer unpräzisen Drehung.
         :param timeout_ms: Maximale Dauer der Hauptdrehung in Millisekunden.
         :param absolute: Interpretiert ``angle`` bei ``True`` als absoluten Zielwinkel.
-        :param precise: Aktiviert Bremsvorhalt, Zielprüfung und Korrektur.
+        :param precise: Verwendet die kontinuierliche Ein-Pass-Drehung.
         :return: ``True`` nach erfolgreichem Abschluss.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
         :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
         """
+        if precise:
+            return self._turn_one_pass(angle, absolute, timeout_ms)
+
         self.check_abort()
         self._telemetry_event("turn", 0, angle)
         self.stop_drive()
@@ -854,7 +929,7 @@ class Robot:
         :param heading: Absoluter Zielwinkel in Grad.
         :param then: Motorverhalten nach Abschluss einer unpräzisen Drehung.
         :param timeout_ms: Maximale Dauer der Hauptdrehung in Millisekunden.
-        :param precise: Aktiviert Bremsvorhalt, Zielprüfung und Korrektur.
+        :param precise: Verwendet die kontinuierliche Ein-Pass-Drehung.
         :return: ``True`` nach erfolgreichem Abschluss.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
         :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
