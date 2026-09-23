@@ -73,5 +73,16 @@ def load(program, robot):
         robot.set_drivebase_settings(straight_speed=200)
         robot.straight(75)
         robot.motor_angle(robot.right_motor, 1000, -380)
+
+    @program(6, "altePalme")
+    def altePalme():
+        robot.set_gyro_use(True)
+        robot.straight(300)
+        robot.motor_angle(robot.right_motor, 300, 40)
+        robot.straight(80)
+        robot.motor_angle(robot.right_motor, 200, -40)
+        robot.straight(-120)
+        robot.motor_angle(robot.right_motor, 300, 40)
+        robot.straight(-200)
                         
         
