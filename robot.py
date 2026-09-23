@@ -730,6 +730,9 @@ class Robot:
             return True
 
         direction = 1 if delta > 0 else -1
+        max_rate = (config.SMOOTH_TURN_SHORT_MAX_RATE
+                    if abs(delta) <= config.SMOOTH_TURN_SHORT_LIMIT_DEG
+                    else config.SMOOTH_TURN_MAX_RATE)
         limit_ms = config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
         timer = StopWatch()
         last_progress_ms = 0
@@ -737,7 +740,7 @@ class Robot:
         next_log_ms = 0
         self._telemetry_event("turn", 0, angle)
         print("SMOOTH_TURN_START", "start", start, "target", target,
-              "max_rate", config.SMOOTH_TURN_MAX_RATE)
+              "max_rate", max_rate)
 
         try:
             while True:
@@ -798,7 +801,7 @@ class Robot:
 
                 approach = remaining - stop_lead
                 profile_rate = (2 * config.SMOOTH_TURN_DECEL * approach) ** 0.5
-                command_rate = min(config.SMOOTH_TURN_MAX_RATE,
+                command_rate = min(max_rate,
                                    max(config.SMOOTH_TURN_MIN_RATE, profile_rate))
                 self.drive_base.drive(0, direction * command_rate)
 

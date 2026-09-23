@@ -49,6 +49,8 @@ TURN_LOG_INTERVAL_MS = 250
 
 # Ein-Pass-Drehung; Startwerte auf der Wettkampfmatte prüfen.
 SMOOTH_TURN_MAX_RATE = 160       # Grad pro Sekunde
+SMOOTH_TURN_SHORT_LIMIT_DEG = 60
+SMOOTH_TURN_SHORT_MAX_RATE = 90
 SMOOTH_TURN_MIN_RATE = 28        # kleinste zuverlässige Dauerdrehung
 SMOOTH_TURN_DECEL = 450         # Grad pro Sekunde zum Abbremsen
 SMOOTH_TURN_STOP_DELAY_MS = 20  # Reaktionszeit und passives Bremsen
