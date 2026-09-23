@@ -11,7 +11,7 @@ from robot import Robot
 
 
 def main():
-    config.SMOOTH_TURN_DEBUG = True
+    config.SMOOTH_TURN_DEBUG = False
     hub = PrimeHub()
     hub.system.set_stop_button(Button.BLUETOOTH)
     left = Motor(config.LEFT_DRIVE_PORT, config.LEFT_DRIVE_DIRECTION)

@@ -745,25 +745,28 @@ class Robot:
                 self._telemetry_tick()
                 now = timer.time()
                 state = self.drive_base.state()
-                heading = self.drive_base.angle()
-                rate = state[3] * direction
+                heading = state[2]
+                rate = max(0, state[3] * direction)
                 remaining = (target - heading) * direction
 
                 if abs(heading - last_angle) >= config.SMOOTH_TURN_STALL_PROGRESS_DEG:
                     last_angle = heading
                     last_progress_ms = now
 
-                # Bei kleiner Drehrate den Bremsweg vor dem Ziel einplanen.
+                # Reaktionsweg und Bremsweg aus der gemessenen Drehrate schätzen.
                 stop_lead = (config.SMOOTH_TURN_STOP_OFFSET_DEG
-                             + max(0, rate) * config.SMOOTH_TURN_STOP_DELAY_MS / 1000)
+                             + rate * config.SMOOTH_TURN_STOP_DELAY_MS / 1000
+                             + rate * rate / (2 * config.SMOOTH_TURN_BRAKE_DECEL))
                 if remaining <= stop_lead:
                     self.drive_base.brake()
                     self.wait(config.SMOOTH_TURN_SETTLE_MS)
                     final = self.drive_base.angle()
                     error = target - final
+                    brake_travel = (final - heading) * direction
                     print("SMOOTH_TURN_DONE", "ms", timer.time(),
                           "target", target, "final", final, "error", error,
-                          "stop_rate", rate)
+                          "stop_rate", rate, "brake_angle", heading,
+                          "brake_travel", brake_travel, "brake_lead", stop_lead)
                     if abs(error) > config.SMOOTH_TURN_ACCEPT_DEG:
                         print("SMOOTH_TURN_ACCURACY_WARNING", error)
                     self._telemetry_event("turn", 1, angle)

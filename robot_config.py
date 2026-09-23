@@ -53,6 +53,7 @@ SMOOTH_TURN_MIN_RATE = 28        # kleinste zuverlässige Dauerdrehung
 SMOOTH_TURN_DECEL = 450         # Grad pro Sekunde zum Abbremsen
 SMOOTH_TURN_STOP_DELAY_MS = 20  # Reaktionszeit und passives Bremsen
 SMOOTH_TURN_STOP_OFFSET_DEG = 0.35
+SMOOTH_TURN_BRAKE_DECEL = 1800  # effektiver Wert aus sechs Hub-Messungen
 SMOOTH_TURN_SETTLE_MS = 90
 SMOOTH_TURN_ACCEPT_DEG = 1.0
 SMOOTH_TURN_STALL_MS = 600       # Zeit ohne messbaren Drehfortschritt

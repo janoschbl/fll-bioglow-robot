@@ -133,28 +133,37 @@ class FakeControl:
 class SimulatedTurnDriveBase(FakeDriveBase):
     """Simuliert eine stetige Drehung mit passivem Bremsweg."""
 
-    def __init__(self, brake_decel=600):
+    def __init__(self, brake_decel=600, drive_decel=900,
+                 drive_gain=1, brake_delay_ms=0):
         super().__init__()
         self.last_ms = FakeStopWatch.now
         self.rate = 0
         self.requested_rate = 0
         self.brake_decel = brake_decel
+        self.drive_decel = drive_decel
+        self.drive_gain = drive_gain
+        self.brake_delay_ms = brake_delay_ms
+        self.brake_started_ms = FakeStopWatch.now
         self.command_rates = []
         self.brake_count = 0
+        self.brake_rates = []
         self.braking = True
 
     def _advance(self):
         while self.last_ms < FakeStopWatch.now:
             step = min(10, FakeStopWatch.now - self.last_ms) / 1000
             if self.braking:
-                reduction = self.brake_decel * step
-                if self.rate > 0:
-                    self.rate = max(0, self.rate - reduction)
-                else:
-                    self.rate = min(0, self.rate + reduction)
+                if self.last_ms >= self.brake_started_ms + self.brake_delay_ms:
+                    reduction = self.brake_decel * step
+                    if self.rate > 0:
+                        self.rate = max(0, self.rate - reduction)
+                    else:
+                        self.rate = min(0, self.rate + reduction)
             else:
-                change = max(-900 * step, min(900 * step,
-                                                self.requested_rate - self.rate))
+                target_rate = self.requested_rate * self.drive_gain
+                slew = 900 if abs(target_rate) >= abs(self.rate) else self.drive_decel
+                change = max(-slew * step, min(slew * step,
+                                               target_rate - self.rate))
                 self.rate += change
             self.current_angle += self.rate * step
             self.last_ms += step * 1000
@@ -175,7 +184,9 @@ class SimulatedTurnDriveBase(FakeDriveBase):
     def brake(self):
         self._advance()
         self.braking = True
+        self.brake_started_ms = FakeStopWatch.now
         self.brake_count += 1
+        self.brake_rates.append(self.rate)
 
 
 def make_robot(drive_base=None, attachment=None):
@@ -292,6 +303,24 @@ class RobotTest(unittest.TestCase):
                 robot.turn(180)
 
                 self.assertLess(abs(drive_base.angle() - 180), 1)
+
+    def test_smooth_turn_accounts_for_speed_dependent_braking(self):
+        for target in (180, -180):
+            with self.subTest(target=target):
+                FakeStopWatch.now = 0
+                drive_base = SimulatedTurnDriveBase(
+                    brake_decel=1500,
+                    drive_decel=300,
+                    drive_gain=1.15,
+                    brake_delay_ms=20,
+                )
+                robot, _, _ = make_robot(drive_base=drive_base)
+
+                robot.turn(target)
+
+                self.assertGreater(abs(drive_base.brake_rates[-1]), 60)
+                self.assertLess(abs(drive_base.angle() - target), 1)
+                self.assertEqual(drive_base.brake_count, 2)
 
     def test_smooth_turn_exits_on_no_progress(self):
         class BlockedTurnDriveBase(SimulatedTurnDriveBase):

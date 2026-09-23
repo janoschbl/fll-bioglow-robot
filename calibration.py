@@ -1,6 +1,6 @@
 """Kalibriert den Ein-Pass-Turn direkt auf dem verbundenen Roboter.
 
-Das Programm vergleicht Bremsvorhalte mit derselben Robot.turn()-Regelung,
+Das Programm vergleicht Bremsverzögerungen mit derselben Robot.turn()-Regelung,
 die auch im normalen Lauf verwendet wird. Jeder Messlauf dreht nur in eine
 Richtung und wird vor dem nächsten Versuch angehalten und neu genullt.
 """
@@ -15,8 +15,8 @@ import robot_config as config
 from robot import MotionTimeout, ProgramAborted, Robot
 
 
-# Nur der Bremsvorhalt variiert; Tempo und Verzögerungsprofil bleiben gleich.
-TEST_BREMSVORHALTE_DEG = (0.2, 0.35, 0.5)
+# Nur die passive Bremsverzögerung variiert; das Fahrprofil bleibt gleich.
+TEST_BREMSVERZOEGERUNGEN = (1500, 1800, 2100)
 TEST_WINKEL_DEG = (33, -33, 47, -47, 180, -180)
 WIEDERHOLUNGEN = 2
 
@@ -57,7 +57,7 @@ def _messlauf(robot, zielwinkel):
 
 
 def kalibrieren(robot):
-    """Vergleicht Bremsvorhalte und meldet das genaueste Profil."""
+    """Vergleicht Bremsverzögerungen und meldet das genaueste Profil."""
     drive_base = robot.drive_base
     robot.set_gyro_use(True)
     robot.reset_drivebase_settings()
@@ -65,14 +65,14 @@ def kalibrieren(robot):
 
     print("CAL_BEGIN")
     print(
-        "CAL_FIELDS,offset_deg,wiederholung,ziel_deg,endwinkel_deg,"
+        "CAL_FIELDS,bremsverzoegerung_deg_s2,wiederholung,ziel_deg,endwinkel_deg,"
         "fehler_deg,dauer_ms,bestanden"
     )
 
     ergebnisse = []
     try:
-        for offset in TEST_BREMSVORHALTE_DEG:
-            config.SMOOTH_TURN_STOP_OFFSET_DEG = offset
+        for bremsverzoegerung in TEST_BREMSVERZOEGERUNGEN:
+            config.SMOOTH_TURN_BRAKE_DECEL = bremsverzoegerung
             fehlerwerte = []
             dauerwerte = []
             bestanden_anzahl = 0
@@ -84,7 +84,8 @@ def kalibrieren(robot):
                 "min_rate", config.SMOOTH_TURN_MIN_RATE,
                 "decel", config.SMOOTH_TURN_DECEL,
                 "delay_ms", config.SMOOTH_TURN_STOP_DELAY_MS,
-                "offset_deg", offset,
+                "offset_deg", config.SMOOTH_TURN_STOP_OFFSET_DEG,
+                "brake_decel", bremsverzoegerung,
             )
 
             for wiederholung in range(1, WIEDERHOLUNGEN + 1):
@@ -100,8 +101,8 @@ def kalibrieren(robot):
                     dauerwerte.append(dauer)
 
                     print(
-                        "CAL_RESULT,{:.2f},{},{},{:.3f},{:.3f},{},{}".format(
-                            offset,
+                        "CAL_RESULT,{},{},{},{:.3f},{:.3f},{},{}".format(
+                            bremsverzoegerung,
                             wiederholung,
                             zielwinkel,
                             endwinkel,
@@ -115,7 +116,7 @@ def kalibrieren(robot):
             groesster_fehler = max(fehlerwerte)
             mittel_dauer = sum(dauerwerte) / len(dauerwerte)
             profil = {
-                "offset": offset,
+                "bremsverzoegerung": bremsverzoegerung,
                 "bestanden": bestanden_anzahl,
                 "messungen": messungen,
                 "mittel_fehler": mittel_fehler,
@@ -124,8 +125,8 @@ def kalibrieren(robot):
             }
             ergebnisse.append(profil)
             print(
-                "CAL_SUMMARY,{:.2f},{},{},{:.3f},{:.3f},{:.1f}".format(
-                    offset,
+                "CAL_SUMMARY,{},{},{},{:.3f},{:.3f},{:.1f}".format(
+                    bremsverzoegerung,
                     bestanden_anzahl,
                     messungen,
                     mittel_fehler,
@@ -147,10 +148,10 @@ def kalibrieren(robot):
             profil["mittel_dauer"],
         ),
     )
-    config.SMOOTH_TURN_STOP_OFFSET_DEG = bestes_profil["offset"]
+    config.SMOOTH_TURN_BRAKE_DECEL = bestes_profil["bremsverzoegerung"]
     print(
-        "CAL_BEST,{:.2f},{},{},{:.3f},{:.3f},{:.1f}".format(
-            bestes_profil["offset"],
+        "CAL_BEST,{},{},{},{:.3f},{:.3f},{:.1f}".format(
+            bestes_profil["bremsverzoegerung"],
             bestes_profil["bestanden"],
             bestes_profil["messungen"],
             bestes_profil["mittel_fehler"],
@@ -159,7 +160,7 @@ def kalibrieren(robot):
         )
     )
     if bestes_profil["bestanden"] != bestes_profil["messungen"]:
-        print("CAL_WARNING", "Kein Bremsvorhalt bestand alle Messungen")
+        print("CAL_WARNING", "Keine Bremsverzögerung bestand alle Messungen")
     print("CAL_END")
 
 
