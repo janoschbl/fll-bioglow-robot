@@ -745,7 +745,7 @@ class Robot:
                 self._telemetry_tick()
                 now = timer.time()
                 state = self.drive_base.state()
-                heading = state[2]
+                heading = self.drive_base.angle()
                 rate = max(0, state[3] * direction)
                 remaining = (target - heading) * direction
 

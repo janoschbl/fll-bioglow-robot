@@ -22,8 +22,9 @@ Pybricks-Drehpfad bei. Geraden, Multitask und Anbaumotoren bleiben unverändert.
 
 Der Kalibrierlauf vergleicht nur die passive Bremsverzögerung, damit jeweils
 eine Variable verändert wird. Höchstgeschwindigkeit, Mindestgeschwindigkeit
-und das Annäherungsprofil bleiben bei den Startwerten. Wenn kein Profil alle Versuche besteht, zuerst
-Akku, Reifen, Matte und Radschlupf prüfen und den Kalibrierlauf wiederholen.
+und das Annäherungsprofil bleiben bei den Startwerten. Wenn kein Profil alle
+Versuche besteht, zuerst Akku, Reifen, Matte und Radschlupf prüfen und den
+Kalibrierlauf wiederholen.
 
 ## Parameter in `robot_config.py`
 
