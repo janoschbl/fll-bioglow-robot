@@ -320,6 +320,7 @@ class RobotTest(unittest.TestCase):
 
                 self.assertGreater(abs(drive_base.brake_rates[-1]), 60)
                 self.assertLess(abs(drive_base.angle() - target), 1)
+                self.assertLessEqual(abs(drive_base.rate), config.SMOOTH_TURN_STOP_RATE_DEG_S)
                 self.assertEqual(drive_base.brake_count, 2)
 
     def test_smooth_turn_exits_on_no_progress(self):

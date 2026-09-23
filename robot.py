@@ -760,13 +760,32 @@ class Robot:
                 if remaining <= stop_lead:
                     self.drive_base.brake()
                     self.wait(config.SMOOTH_TURN_SETTLE_MS)
+                    settle_timer = StopWatch()
+                    stable_since = None
+                    while True:
+                        self.check_abort()
+                        self._telemetry_tick()
+                        settle_now = settle_timer.time()
+                        settle_rate = abs(self.drive_base.state()[3])
+                        if settle_rate <= config.SMOOTH_TURN_STOP_RATE_DEG_S:
+                            if stable_since is None:
+                                stable_since = settle_now
+                            elif settle_now - stable_since >= config.SMOOTH_TURN_STOP_STABLE_MS:
+                                break
+                        else:
+                            stable_since = None
+                        if settle_now >= config.SMOOTH_TURN_SETTLE_TIMEOUT_MS:
+                            raise MotionTimeout("smooth turn did not settle after braking")
+                        wait(config.MOTION_POLL_MS)
                     final = self.drive_base.angle()
                     error = target - final
                     brake_travel = (final - heading) * direction
                     print("SMOOTH_TURN_DONE", "ms", timer.time(),
                           "target", target, "final", final, "error", error,
                           "stop_rate", rate, "brake_angle", heading,
-                          "brake_travel", brake_travel, "brake_lead", stop_lead)
+                          "brake_travel", brake_travel, "brake_lead", stop_lead,
+                          "settle_ms", config.SMOOTH_TURN_SETTLE_MS + settle_timer.time(),
+                          "settle_rate", settle_rate)
                     if abs(error) > config.SMOOTH_TURN_ACCEPT_DEG:
                         print("SMOOTH_TURN_ACCURACY_WARNING", error)
                     self._telemetry_event("turn", 1, angle)

@@ -16,7 +16,7 @@ from robot import MotionTimeout, ProgramAborted, Robot
 
 
 # Nur die passive Bremsverzögerung variiert; das Fahrprofil bleibt gleich.
-TEST_BREMSVERZOEGERUNGEN = (1500, 1800, 2100)
+TEST_BREMSVERZOEGERUNGEN = (1800, 1500, 2100)
 TEST_WINKEL_DEG = (33, -33, 47, -47, 180, -180)
 WIEDERHOLUNGEN = 2
 
@@ -34,8 +34,10 @@ def _messlauf(robot, zielwinkel):
     """Führt eine Ein-Pass-Drehung aus und liefert Zeit und Winkelfehler."""
     drive_base = robot.drive_base
     drive_base.brake()
-    drive_base.reset(distance=drive_base.distance(), angle=0)
     wait(REGEL_PAUSE_MS)
+    drive_base.reset(distance=drive_base.distance(), angle=0)
+    startwinkel = drive_base.angle()
+    ziel_absolut = startwinkel + zielwinkel
 
     uhr = StopWatch()
     try:
@@ -47,13 +49,13 @@ def _messlauf(robot, zielwinkel):
 
     dauer = uhr.time()
     endwinkel = drive_base.angle()
-    fehler = zielwinkel - endwinkel
+    fehler = ziel_absolut - endwinkel
     bestanden = (
         erfolgreich
         and dauer < MAX_DAUER_MS
         and abs(fehler) <= config.SMOOTH_TURN_ACCEPT_DEG
     )
-    return dauer, endwinkel, fehler, bestanden
+    return startwinkel, dauer, endwinkel, fehler, bestanden
 
 
 def kalibrieren(robot):
@@ -65,7 +67,8 @@ def kalibrieren(robot):
 
     print("CAL_BEGIN")
     print(
-        "CAL_FIELDS,bremsverzoegerung_deg_s2,wiederholung,ziel_deg,endwinkel_deg,"
+        "CAL_FIELDS,bremsverzoegerung_deg_s2,wiederholung,ziel_relativ_deg,"
+        "startwinkel_deg,endwinkel_deg,"
         "fehler_deg,dauer_ms,bestanden"
     )
 
@@ -91,7 +94,7 @@ def kalibrieren(robot):
             for wiederholung in range(1, WIEDERHOLUNGEN + 1):
                 for zielwinkel in TEST_WINKEL_DEG:
                     robot.check_abort()
-                    dauer, endwinkel, fehler, bestanden = _messlauf(
+                    startwinkel, dauer, endwinkel, fehler, bestanden = _messlauf(
                         robot,
                         zielwinkel,
                     )
@@ -101,10 +104,11 @@ def kalibrieren(robot):
                     dauerwerte.append(dauer)
 
                     print(
-                        "CAL_RESULT,{},{},{},{:.3f},{:.3f},{},{}".format(
+                        "CAL_RESULT,{},{},{},{:.3f},{:.3f},{:.3f},{},{}".format(
                             bremsverzoegerung,
                             wiederholung,
                             zielwinkel,
+                            startwinkel,
                             endwinkel,
                             fehler,
                             dauer,
