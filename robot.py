@@ -1,7 +1,33 @@
 from pybricks.parameters import Button, Stop
 from pybricks.tools import StopWatch, wait
 
+from math import cos, pi, sin, sqrt
 import robot_config as config
+
+# --- Geradeausfahrt (straight): beide Raeder folgen einem gemeinsamen Weg-Zeit-Profil
+# (Positionsregelung je Rad), der Gyro korrigiert nur langsam die Drift.
+STRAIGHT_PID = {
+    "v_cap": 500,       # mm/s: hoechste getestete Geschwindigkeit
+    "acc": 1100,        # mm/s^2 Spitzenbeschleunigung (Sinus-Rampe)
+    "dec": 1100,        # mm/s^2 Spitzenverzoegerung
+    "kw": 25.0,         # 1/s: Positionsfehler -> Zusatzgeschwindigkeit
+    "kdiff": 25.0,      # 1/s: Gleichlauf-Regelung der Raddifferenz
+    "alpha": 0.1,       # Filter fuer Gyro-minus-Encoder-Drift (je Schleife)
+    "motor_acc": 5000,  # deg/s^2: Motor-Beschleunigungslimit waehrend der Fahrt
+    "final_speed": 120, # deg/s im Endanflug
+    "tries": 3,         # max. Versuche im Endanflug
+    "retry_tol": 1.0,   # mm: Endanflug fertig, wenn Strecke genau genug ...
+    "retry_head": 0.25, # Grad: ... und Richtung genau genug
+    "head_final_max": 2.0,  # Grad: max. Richtungskorrektur im Endanflug
+    "max_lag": 40,      # mm: Rad hinkt so weit hinterher -> blockiert
+    "loop_ms": 5,
+}
+STRAIGHT_DEG2RAD = 0.0174532925
+STRAIGHT_RAD2DEG = 57.2957795
+
+
+def _sclamp(x, lo, hi):
+    return lo if x < lo else hi if x > hi else x
 
 
 class ProgramAborted(Exception):
@@ -462,139 +488,164 @@ class Robot:
             wait(config.MOTION_POLL_MS)
 
     def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
-        """Fährt eine relative Strecke mit eigener Distanzüberwachung.
+        """Faehrt eine relative Strecke praezise und moeglichst gerade.
 
-        :param distance: Strecke in Millimetern; negative Werte fahren rückwärts.
+        Beide Fahrmotoren folgen per Positionsregelung demselben Weg-Zeit-Profil
+        (Sinus-Rampen), die Richtung wird ueber die Raddifferenz gehalten und
+        der Gyro korrigiert langsam die Encoder-Drift. Zum Schluss bringt ein
+        Endanflug Strecke und Richtung gemeinsam aufs Ziel.
+
+        :param distance: Strecke in Millimetern; negative Werte fahren rueckwaerts.
         :param then: Motorverhalten nach Abschluss der Bewegung.
-        :param timeout_ms: Maximale Dauer in Millisekunden oder ``None``.
-        :return: ``True`` nach erfolgreichem Abschluss.
+        :param timeout_ms: Maximale Dauer in Millisekunden oder None.
+        :return: True nach erfolgreichem Abschluss.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
-        :raises MotionTimeout: Wenn das Zeitlimit überschritten wird.
+        :raises MotionTimeout: Wenn das Zeitlimit ueberschritten wird.
         """
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
-        self._reset_drive_control()
-        start_distance = self.drive_base.distance()
-        target_distance = start_distance + distance
-        direction = 1 if distance >= 0 else -1
+        if distance == 0:
+            self._telemetry_event("straight", 1, distance)
+            return True
+        self.stop_drive()
+        q = STRAIGHT_PID
         timeout_ms = config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
+        left = self.left_drive_motor
+        right = self.right_drive_motor
+        mm_deg = 3.14159265 * config.WHEEL_DIAMETER_MM / 360
+        track = config.AXLE_TRACK_MM
+        half = track / 2 * STRAIGHT_DEG2RAD
+
         try:
             straight_speed = abs(self.drive_base.settings()[0])
         except (AttributeError, OSError, TypeError):
             straight_speed = config.DEFAULT_STRAIGHT_SPEED
-        brake_lead = max(
-            config.STRAIGHT_MIN_BRAKE_LEAD_MM,
-            straight_speed * config.STRAIGHT_BRAKE_REACTION_MS / 1000,
-        )
-        self.drive_base.straight(distance, then=then, wait=False)
+
+        # Profil: Sinus-Rampen mit Haltephase
+        total = abs(distance)
+        top = _sclamp(straight_speed, 50, q["v_cap"])
+        acc = q["acc"]
+        dec = q["dec"]
+        kk = pi / 4 * (1 / acc + 1 / dec)
+        if kk * top * top > total:
+            top = sqrt(total / kk)
+        t_acc = pi * top / (2 * acc)
+        t_dec = pi * top / (2 * dec)
+        s_acc = top * t_acc / 2
+        t_cruise = max(0, (total - s_acc - top * t_dec / 2) / top)
+        t_end = t_acc + t_cruise + t_dec
+        t_end_ms = t_end * 1000
+
+        saved_limits = []
+        saved_tol = []
+        for motor in (left, right):
+            speed_lim, acc_lim, torque_lim = motor.control.limits()
+            saved_limits.append((speed_lim, acc_lim, torque_lim))
+            motor.control.limits(speed_lim, max(acc_lim, q["motor_acc"]), torque_lim)
+            speed_tol, pos_tol = motor.control.target_tolerances()
+            saved_tol.append((speed_tol, pos_tol))
+            motor.control.target_tolerances(speed_tol, 1)
 
         timer = StopWatch()
-        next_log = 0
-        armed = False
-        saw_not_done = False
-
-        print(
-            "STRAIGHT_START",
-            "start", start_distance,
-            "target", target_distance,
-            "distance", distance,
-            "speed", straight_speed,
-            "brake_lead", brake_lead,
-            "timeout_ms", timeout_ms,
-        )
-
         try:
+            lm = left.angle() * mm_deg
+            rm = right.angle() * mm_deg
+            c0 = (lm + rm) / 2
+            target = c0 + distance
+            span = distance
+            heading_goal = self.hub.imu.heading()
+            drift = heading_goal - (lm - rm) / track * STRAIGHT_RAD2DEG
+            kw = q["kw"]
+            kd = q["kdiff"]
+            alpha = q["alpha"]
+            print("STRAIGHT_START", "distance", distance, "speed", top,
+                  "heading", heading_goal, "timeout_ms", timeout_ms)
+
             while True:
                 self.check_abort()
                 self._telemetry_tick()
+                tm = timer.time()
+                t = tm / 1000
+                if t < t_acc:
+                    s = top / 2 * (t - t_acc / pi * sin(pi * t / t_acc))
+                    v = top / 2 * (1 - cos(pi * t / t_acc))
+                elif t < t_acc + t_cruise:
+                    s = s_acc + top * (t - t_acc)
+                    v = top
+                elif t < t_end:
+                    u = t - t_acc - t_cruise
+                    s = s_acc + top * t_cruise + top / 2 * (u + t_dec / pi * sin(pi * u / t_dec))
+                    v = top / 2 * (1 + cos(pi * u / t_dec))
+                else:
+                    s = total
+                    v = 0
+                lm = left.angle() * mm_deg
+                rm = right.angle() * mm_deg
+                heading = self.hub.imu.heading()
+                drift += alpha * ((heading - (lm - rm) / track * STRAIGHT_RAD2DEG) - drift)
+                delta = (heading_goal - drift) * half
+                c = c0 + span * s / total
+                vc = v * span / total
+                err_l = c + delta - lm
+                err_r = c - delta - rm
+                em = c - (lm + rm) / 2
+                ed = delta - (lm - rm) / 2
+                left.run((vc + kw * em + kd * ed) / mm_deg)
+                right.run((vc + kw * em - kd * ed) / mm_deg)
 
-                elapsed = timer.time()
-                current_distance = self.drive_base.distance()
-                error = target_distance - current_distance
-                remaining = error * direction
-                progress = abs(current_distance - start_distance)
-                done_state = self.drive_base.done()
-
-                if not done_state:
-                    saw_not_done = True
-                if not armed and (
-                    progress >= config.MOTION_MIN_PROGRESS_MM
-                    or (
-                        elapsed >= config.MOTION_START_GUARD_MS
-                        and saw_not_done
-                    )
-                ):
-                    armed = True
-                    print("STRAIGHT_ARMED", "ms", elapsed, "progress", progress)
-
-                if elapsed >= next_log:
-                    print(
-                        "STRAIGHT_STATUS",
-                        "ms", elapsed,
-                        "distance", current_distance,
-                        "target", target_distance,
-                        "error", error,
-                        "done", done_state,
-                        "armed", armed,
-                    )
-                    next_log = elapsed + config.TURN_LOG_INTERVAL_MS
-
-                if armed and remaining <= brake_lead:
-                    print(
-                        "STRAIGHT_TARGET_REACHED",
-                        "ms", elapsed,
-                        "distance", current_distance,
-                        "error", error,
-                        "remaining", remaining,
-                        "brake_lead", brake_lead,
-                    )
+                if max(abs(err_l), abs(err_r)) > q["max_lag"]:
                     self.brake_drive()
-                    self.wait(config.STRAIGHT_BRAKE_SETTLE_MS)
-                    final_distance = self.drive_base.distance()
-                    final_error = target_distance - final_distance
-                    print(
-                        "STRAIGHT_DONE",
-                        "ms", timer.time(),
-                        "distance", final_distance,
-                        "error", final_error,
-                        "source", "measured_distance_brake",
-                    )
-                    if abs(final_error) > config.STRAIGHT_COMPLETION_TOLERANCE_MM:
-                        print("STRAIGHT_ACCURACY_WARNING", target_distance, final_error)
+                    print("STRAIGHT_BLOCKED", "ms", tm, "err_l", err_l, "err_r", err_r)
+                    raise MotionTimeout("straight blocked")
+                if tm >= t_end_ms:
                     break
-
-                if armed and done_state:
-                    print(
-                        "STRAIGHT_DONE",
-                        "ms", elapsed,
-                        "distance", current_distance,
-                        "error", error,
-                        "source", "pybricks",
-                    )
-                    break
-
-                if elapsed >= timeout_ms:
-                    print(
-                        "STRAIGHT_TIMEOUT",
-                        "ms", elapsed,
-                        "distance", current_distance,
-                        "target", target_distance,
-                        "error", error,
-                        "done", done_state,
-                    )
+                if tm > timeout_ms:
+                    self.brake_drive()
+                    print("STRAIGHT_TIMEOUT", "ms", tm, "target", target)
                     raise MotionTimeout("straight timed out")
+                wait(q["loop_ms"])
 
-                wait(config.MOTION_POLL_MS)
+            # Endanflug: Strecke und Richtung gemeinsam aufs Ziel
+            for attempt in range(1, q["tries"] + 1):
+                herr = heading_goal - self.hub.imu.heading()
+                here = (left.angle() + right.angle()) * 0.5 * mm_deg
+                dlt = (target - here) / mm_deg
+                sh = _sclamp(herr, -q["head_final_max"], q["head_final_max"]) * half / mm_deg
+                if attempt > 1 and abs(dlt) + abs(sh) < 1.2:
+                    break  # kleiner als die Encoder-Aufloesung (1 Grad): nicht mehr korrigierbar
+                left.run_target(q["final_speed"], left.angle() + dlt + sh, Stop.HOLD, False)
+                right.run_target(q["final_speed"], right.angle() + dlt - sh, Stop.HOLD, False)
+                settle = StopWatch()
+                while settle.time() < 300:
+                    self.check_abort()
+                    if settle.time() > 60 and abs(left.speed()) < 15 and abs(right.speed()) < 15:
+                        break
+                    wait(q["loop_ms"])
+                here = (left.angle() + right.angle()) * 0.5 * mm_deg
+                herr = heading_goal - self.hub.imu.heading()
+                print("STRAIGHT_SETTLE", attempt, "err_mm", here - target, "herr", herr, "ms", settle.time())
+                if abs(here - target) <= q["retry_tol"] and abs(herr) <= q["retry_head"]:
+                    break
+
+            if then == Stop.BRAKE:
+                left.brake()
+                right.brake()
+            elif then != Stop.HOLD:
+                left.stop()
+                right.stop()
+            here = (left.angle() + right.angle()) * 0.5 * mm_deg
+            print("STRAIGHT_DONE", "ms", timer.time(), "error_mm", here - target,
+                  "heading_err", heading_goal - self.hub.imu.heading())
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
             self._telemetry_event("straight", 2, distance)
             raise
+        finally:
+            for motor, lim, tol in zip((left, right), saved_limits, saved_tol):
+                motor.control.limits(lim[0], lim[1], lim[2])
+                motor.control.target_tolerances(tol[0], tol[1])
 
-        print(
-            "STRAIGHT_FINISH",
-            "target", target_distance,
-            "distance", self.drive_base.distance(),
-        )
+        self._reset_drive_control()
         self._telemetry_event("straight", 1, distance)
         return True
 
