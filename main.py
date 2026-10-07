@@ -14,7 +14,7 @@ def create_force_sensor():
     try:
         return ForceSensor(config.FORCE_SENSOR_PORT)
     except OSError:
-        print("FORCE_SENSOR_UNAVAILABLE port", config.FORCE_SENSOR_PORT)
+        config.protokolliere("FORCE_SENSOR_UNAVAILABLE port", config.FORCE_SENSOR_PORT)
         return None
 
 
@@ -52,13 +52,14 @@ def main():
     robot.reset_drivebase_settings()
 
     force_sensor = create_force_sensor()
-    telemetry = Telemetry(
-        hub,
-        drive_base,
-        (left_motor, right_motor, left_drive_motor, right_drive_motor),
-        force_sensor,
-    )
-    robot.set_telemetry(telemetry)
+    if config.TELEMETRY_ENABLED:
+        telemetry = Telemetry(
+            hub,
+            drive_base,
+            (left_motor, right_motor, left_drive_motor, right_drive_motor),
+            force_sensor,
+        )
+        robot.set_telemetry(telemetry)
     menu = Menu(hub, robot, force_sensor)
     programs.load(menu.program, robot)
 

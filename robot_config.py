@@ -70,5 +70,12 @@ STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3
 STALL_MIN_PROGRESS_RATIO = 0.10
 
+# False: keine Telemetrie und keine Konsolenausgaben; direkt zum nächsten Programm.
+TELEMETRY_ENABLED = True
 TELEMETRY_SAMPLE_MS = 20
 TELEMETRY_MAX_BYTES = 180000
+
+
+def protokolliere(*werte, **optionen):
+    if TELEMETRY_ENABLED:
+        print(*werte, **optionen)
