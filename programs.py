@@ -1,6 +1,28 @@
 def load(program, robot):
 
-    @program(9, "DerErsteRun?!")
+    @program(1, "setup")
+    def setupmotor():
+        robot.motor_target(robot.right_motor, 300, 45)
+        robot.motor_target(robot.left_motor, 300, 0)
+        robot.wait(2000)
+        
+    @program(2, "betterGamble")
+    def bettergamble():
+        robot.reset_drivebase_settings()
+        robot.set_drivebase_settings(800)
+        robot.set_gyro_use(True)
+        robot.straight(-10)
+        robot.reset_heading(0)
+        robot.set_gyro_use(True)
+        
+        robot.reset_heading(0)
+        robot.straight(850)
+        robot.motor_angle(robot.right_motor, 300, -300)
+        robot.straight(55)
+        robot.motor_angle(robot.right_motor, 800, -360)
+        robot.straight(-850)
+    
+    @program(3, "DerErsteRun?!")
     def route_program():
         robot.set_gyro_use(True)
         robot.set_drivebase_settings(800)
@@ -13,51 +35,8 @@ def load(program, robot):
         robot.motor_angle(robot.right_motor, speed=300, angle=130)
         robot.set_drivebase_settings(straight_speed=800)
         robot.straight(-500)
-
-    @program(8, "weisses Ding")
-    def route_program():
-        robot.set_drivebase_settings(550)
-        robot.straight(-10)
-        robot.reset_heading(0)
-        robot.straight(800)
-        robot.straight(-90)
-        robot.straight(50)
-        robot.wait(200)
-        robot.straight(-20)
-        robot.turn(135)
-        robot.straight(-150)
-        robot.turn(-45)
-        robot.straight(220)
-        robot.turn(-15)
-        robot.straight(40)
-        robot.motor_angle(robot.right_motor, 600, -60)
-        robot.turn(20)
-        robot.motor_angle(robot.right_motor, 600, 60)
-        robot.straight(-180)
-        robot.turn(70)
-        robot.straight(670)
-        
-        
-    @program(5, "Mariia")
-    def mariia():
-        robot.set_gyro_use(True)
-        robot.straight(600)
-        robot.turn(60)
-        robot.straight(700)
-        robot.turn(45)
-        robot.straight(440)
-        robot.turn(-60)
-        robot.set_drivebase_settings(straight_speed=60)
-        robot.straight(100)
-        robot.set_drivebase_settings(straight_speed=450)
-        robot.straight(-50)
-        robot.turn(90)
-        robot.straight(600)
-        robot.turn(30)
-        robot.straight(200)
-        
     
-    @program(10, "Drohnenfiech")
+    @program(4, "Drohnenfiech")
     def drohnenfiech():
         robot.set_gyro_use(True)
         robot.set_drivebase_settings(450)
@@ -94,31 +73,37 @@ def load(program, robot):
         robot.straight(200)
         robot.turn(30)
         robot.straight(500)
-
-    @program(1, "setup")
-    def setupmotor():
-        robot.motor_target(robot.right_motor, 300, 45)
-        robot.motor_target(robot.left_motor, 300, 0)
-        robot.wait(2000)
-        
-    @program(2, "betterGamble")
-    def bettergamble():
-        robot.reset_drivebase_settings()
-        robot.set_drivebase_settings(650)
-        robot.set_gyro_use(True)
+                        
+    @program(5, "weisses Ding")
+    def route_program():
+        robot.motor_target(robot.right_motor, 500, -10)
+        robot.wait(5000)
+        robot.set_drivebase_settings(550)
         robot.straight(-10)
         robot.reset_heading(0)
-        robot.set_gyro_use(True)
-        
-        robot.reset_heading(0)
-        robot.straight(850)
-        robot.motor_angle(robot.right_motor, 300, -300)
-        robot.straight(80)
-        robot.motor_angle(robot.right_motor, 800, -360)
-        robot.straight(-850)
-        
+        robot.straight(800)
+        robot.straight(-90)
+        robot.straight(50)
+        robot.wait(200)
+        robot.straight(-20)
+        robot.turn(135)
+        robot.straight(-150)
+        robot.turn(-50)
+        robot.straight(215)
+        robot.turn(-10)
+        robot.motor_angle(robot.right_motor, 600, -60)
+        robot.turn(15)
+        robot.motor_angle(robot.right_motor, 600, 60)
+        robot.straight(-180)
+        robot.turn(70)
+        robot.straight(680)
+        robot.wait(180)
+        robot.set_drivebase_settings(turn_rate=500)
+        robot.turn(-160, precise=False)
+        robot.motor_target(robot.right_motor, 600, -50)
 
-    @program(11, "altePalme")
+
+    @program(6, "altePalme")
     def altePalme():
         robot.set_gyro_use(True)
         robot.straight(-10)
@@ -127,9 +112,7 @@ def load(program, robot):
         robot.straight(300)
         robot.motor_angle(robot.right_motor, 300, 40)
         robot.straight(80)
-        robot.motor_angle(robot.right_motor, 200, -40)
+        robot.motor_angle(robot.right_motor, 200, -55)
         robot.straight(-120)
-        robot.motor_angle(robot.right_motor, 300, 40)
+        robot.motor_angle(robot.right_motor, 300, 55)
         robot.straight(-200)
-                        
-        

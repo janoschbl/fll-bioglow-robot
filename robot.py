@@ -7,7 +7,7 @@ import robot_config as config
 # --- Geradeausfahrt (straight): beide Raeder folgen einem gemeinsamen Weg-Zeit-Profil
 # (Positionsregelung je Rad), der Gyro korrigiert nur langsam die Drift.
 STRAIGHT_PID = {
-    "v_cap": 500,       # mm/s: hoechste getestete Geschwindigkeit
+    "v_cap": 800,       # mm/s: hoechste getestete Geschwindigkeit
     "acc": 1100,        # mm/s^2 Spitzenbeschleunigung (Sinus-Rampe)
     "dec": 1100,        # mm/s^2 Spitzenverzoegerung
     "kw": 25.0,         # 1/s: Positionsfehler -> Zusatzgeschwindigkeit
