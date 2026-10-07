@@ -71,11 +71,11 @@ class Telemetry:
         self.force_sensor = force_sensor
         self.clock = StopWatch()
         self.app_data = None
-        if AppData is not None:
+        if config.TELEMETRY_ENABLED and AppData is not None:
             try:
                 self.app_data = AppData([])
             except Exception as error:
-                print("TELEMETRY_APPDATA_UNAVAILABLE", str(error))
+                config.protokolliere("TELEMETRY_APPDATA_UNAVAILABLE", str(error))
 
         self.active = False
         self.data = bytearray()
@@ -89,6 +89,8 @@ class Telemetry:
         self.buffer_full = False
 
     def begin(self, name):
+        if not config.TELEMETRY_ENABLED:
+            return
         self.run_id = (self.run_id + 1) & 0x3FFFFFFF
         self.run_name = str(name)[:80]
         self.started_ms = self.clock.time()
@@ -125,7 +127,7 @@ class Telemetry:
         return True
 
     def tick(self, force=False):
-        if not self.active:
+        if not config.TELEMETRY_ENABLED or not self.active:
             return
         now = self.clock.time()
         if not force and now < self.next_sample_ms:
@@ -190,10 +192,10 @@ class Telemetry:
         except Exception as error:
             self.dropped += 1
             if self.dropped == 1:
-                print("TELEMETRY_SAMPLE_ERROR", str(error))
+                config.protokolliere("TELEMETRY_SAMPLE_ERROR", str(error))
 
     def event(self, name, phase, value1=0, value2=0):
-        if not self.active:
+        if not config.TELEMETRY_ENABLED or not self.active:
             return
         identifier = EVENT_IDS.get(name, 0)
         record = struct.pack(
@@ -213,15 +215,17 @@ class Telemetry:
         return header + struct.pack("<H", _crc16(header + payload)) + payload
 
     def _send(self, packet):
+        if not config.TELEMETRY_ENABLED:
+            return
         if self.app_data is not None:
             self.app_data.write_bytes(packet)
             return
         if ubinascii is None:
             raise RuntimeError("Kein AppData- oder Base64-Transport verfügbar")
-        print("@BGB1", ubinascii.b2a_base64(packet).decode().strip())
+        config.protokolliere("@BGB1", ubinascii.b2a_base64(packet).decode().strip())
 
     def finish_and_send(self, outcome):
-        if not self.active:
+        if not config.TELEMETRY_ENABLED or not self.active:
             return
         self.tick(force=True)
         self.active = False
@@ -241,4 +245,4 @@ class Telemetry:
             OUTCOMES.get(outcome, OUTCOMES["error"]),
         )
         self._send(self._packet(2, sequence, end))
-        print("TELEMETRY_SENT", self.run_id, self.samples, self.events, self.dropped, outcome)
+        config.protokolliere("TELEMETRY_SENT", self.run_id, self.samples, self.events, self.dropped, outcome)

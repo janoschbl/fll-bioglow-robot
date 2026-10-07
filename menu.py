@@ -1,6 +1,7 @@
 from pybricks.parameters import Button
 from pybricks.tools import StopWatch, wait
 
+import robot_config as config
 from robot import MotionTimeout, ProgramAborted
 
 
@@ -199,7 +200,7 @@ class Menu:
         try:
             force_pressed = self.force_sensor.pressed()
         except Exception as error:
-            print("FORCE_SENSOR_ERROR", str(error))
+            config.protokolliere("FORCE_SENSOR_ERROR", str(error))
             self.stop_active_debug_motor()
             return
 
@@ -208,7 +209,7 @@ class Menu:
                 force = max(0, min(10, self.force_sensor.force()))
                 speed = 100 + int(force * force * 9)
             except Exception as error:
-                print("FORCE_SENSOR_ERROR", str(error))
+                config.protokolliere("FORCE_SENSOR_ERROR", str(error))
                 speed = 200
 
             if self.active_debug_motor is not None and self.active_debug_motor is not motor:
@@ -235,20 +236,20 @@ class Menu:
             entry["func"]()
         except ProgramAborted:
             outcome = "aborted"
-            print("PROGRAM_ABORTED", entry["name"])
+            config.protokolliere("PROGRAM_ABORTED", entry["name"])
         except MotionTimeout as error:
             outcome = "timeout"
-            print("PROGRAM_TIMEOUT", entry["name"], str(error))
+            config.protokolliere("PROGRAM_TIMEOUT", entry["name"], str(error))
         except Exception as error:
             outcome = "error"
-            print("PROGRAM_ERROR", entry["name"], str(error))
+            config.protokolliere("PROGRAM_ERROR", entry["name"], str(error))
         finally:
             self.robot.emergency_stop()
             self.robot.reset_drivebase_settings()
             try:
                 self.robot.end_program(outcome)
             except Exception as error:
-                print("TELEMETRY_SEND_ERROR", str(error))
+                config.protokolliere("TELEMETRY_SEND_ERROR", str(error))
             self.running_program = None
             self.previous_buttons = set(self.hub.buttons.pressed())
             self.hub.display.off()
@@ -262,8 +263,8 @@ class Menu:
         self.previous_buttons = set(self.hub.buttons.pressed())
         self.write_display()
 
-        print("DriveBase settings:")
-        print(self.robot.drive_base.settings())
+        config.protokolliere("DriveBase settings:")
+        config.protokolliere(self.robot.drive_base.settings())
 
         while True:
             buttons = set(self.hub.buttons.pressed())

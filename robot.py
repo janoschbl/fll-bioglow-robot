@@ -166,14 +166,14 @@ class Robot:
         try:
             self.drive_base.stop()
         except Exception as error:
-            print("STOP_ERROR drive_base", str(error))
+            config.protokolliere("STOP_ERROR drive_base", str(error))
 
         if include_motors:
             for motor in self.drive_motors:
                 try:
                     motor.stop()
                 except Exception as error:
-                    print("STOP_ERROR drive_motor", str(error))
+                    config.protokolliere("STOP_ERROR drive_motor", str(error))
 
     def brake_drive(self):
         """Beendet den DriveBase-Regler und bremst beide Fahrmotoren sofort."""
@@ -182,7 +182,7 @@ class Robot:
             try:
                 motor.brake()
             except Exception as error:
-                print("BRAKE_ERROR drive_motor", str(error))
+                config.protokolliere("BRAKE_ERROR drive_motor", str(error))
 
     def stop_attachment(self, motor):
         """Stoppt einen Anbaumotor.
@@ -192,7 +192,7 @@ class Robot:
         try:
             motor.stop()
         except Exception as error:
-            print("STOP_ERROR attachment", str(error))
+            config.protokolliere("STOP_ERROR attachment", str(error))
 
     def stop_attachments(self):
         """Stoppt beide konfigurierten Anbaumotoren."""
@@ -242,7 +242,7 @@ class Robot:
                 config.TURN_POSITION_TOLERANCE_DEG,
             )
         except (AttributeError, OSError, TypeError) as error:
-            print("TURN_TOLERANCE_UNAVAILABLE", str(error))
+            config.protokolliere("TURN_TOLERANCE_UNAVAILABLE", str(error))
 
     def set_gyro_use(self, value):
         """Aktiviert oder deaktiviert die Gyro-Regelung der DriveBase.
@@ -558,7 +558,7 @@ class Robot:
             kw = q["kw"]
             kd = q["kdiff"]
             alpha = q["alpha"]
-            print("STRAIGHT_START", "distance", distance, "speed", top,
+            config.protokolliere("STRAIGHT_START", "distance", distance, "speed", top,
                   "heading", heading_goal, "timeout_ms", timeout_ms)
 
             while True:
@@ -595,13 +595,13 @@ class Robot:
 
                 if max(abs(err_l), abs(err_r)) > q["max_lag"]:
                     self.brake_drive()
-                    print("STRAIGHT_BLOCKED", "ms", tm, "err_l", err_l, "err_r", err_r)
+                    config.protokolliere("STRAIGHT_BLOCKED", "ms", tm, "err_l", err_l, "err_r", err_r)
                     raise MotionTimeout("straight blocked")
                 if tm >= t_end_ms:
                     break
                 if tm > timeout_ms:
                     self.brake_drive()
-                    print("STRAIGHT_TIMEOUT", "ms", tm, "target", target)
+                    config.protokolliere("STRAIGHT_TIMEOUT", "ms", tm, "target", target)
                     raise MotionTimeout("straight timed out")
                 wait(q["loop_ms"])
 
@@ -623,7 +623,7 @@ class Robot:
                     wait(q["loop_ms"])
                 here = (left.angle() + right.angle()) * 0.5 * mm_deg
                 herr = heading_goal - self.hub.imu.heading()
-                print("STRAIGHT_SETTLE", attempt, "err_mm", here - target, "herr", herr, "ms", settle.time())
+                config.protokolliere("STRAIGHT_SETTLE", attempt, "err_mm", here - target, "herr", herr, "ms", settle.time())
                 if abs(here - target) <= q["retry_tol"] and abs(herr) <= q["retry_head"]:
                     break
 
@@ -634,7 +634,7 @@ class Robot:
                 left.stop()
                 right.stop()
             here = (left.angle() + right.angle()) * 0.5 * mm_deg
-            print("STRAIGHT_DONE", "ms", timer.time(), "error_mm", here - target,
+            config.protokolliere("STRAIGHT_DONE", "ms", timer.time(), "error_mm", here - target,
                   "heading_err", heading_goal - self.hub.imu.heading())
         except (ProgramAborted, MotionTimeout):
             self.stop_drive()
@@ -682,7 +682,7 @@ class Robot:
         armed = False
         saw_not_done = False
 
-        print(
+        config.protokolliere(
             "TURN_START",
             "start", start_angle,
             "target", target_angle,
@@ -712,10 +712,10 @@ class Robot:
                 )
             ):
                 armed = True
-                print("TURN_ARMED", "ms", elapsed, "progress", progress)
+                config.protokolliere("TURN_ARMED", "ms", elapsed, "progress", progress)
 
             if elapsed >= next_log:
-                print(
+                config.protokolliere(
                     "TURN_STATUS",
                     "ms", elapsed,
                     "angle", current_angle,
@@ -728,7 +728,7 @@ class Robot:
 
             in_target = armed and remaining <= config.TURN_BRAKE_LEAD_DEG
             if in_target:
-                print(
+                config.protokolliere(
                     "TURN_TARGET_REACHED",
                     "ms", elapsed,
                     "angle", current_angle,
@@ -737,7 +737,7 @@ class Robot:
                     "brake_lead", config.TURN_BRAKE_LEAD_DEG,
                 )
                 self.brake_drive()
-                print(
+                config.protokolliere(
                     "TURN_DONE",
                     "ms", elapsed,
                     "angle", self.drive_base.angle(),
@@ -747,7 +747,7 @@ class Robot:
                 return "measured_angle"
 
             if armed and done_state:
-                print(
+                config.protokolliere(
                     "TURN_SEGMENT_DONE",
                     "ms", elapsed,
                     "angle", current_angle,
@@ -757,7 +757,7 @@ class Robot:
                 return "pybricks"
 
             if elapsed >= timeout_ms:
-                print(
+                config.protokolliere(
                     "TURN_TIMEOUT",
                     "ms", elapsed,
                     "angle", current_angle,
@@ -790,7 +790,7 @@ class Robot:
         last_angle = start
         next_log_ms = 0
         self._telemetry_event("turn", 0, angle)
-        print("SMOOTH_TURN_START", "start", start, "target", target,
+        config.protokolliere("SMOOTH_TURN_START", "start", start, "target", target,
               "max_rate", max_rate)
 
         try:
@@ -834,14 +834,14 @@ class Robot:
                     final = self.drive_base.angle()
                     error = target - final
                     brake_travel = (final - heading) * direction
-                    print("SMOOTH_TURN_DONE", "ms", timer.time(),
+                    config.protokolliere("SMOOTH_TURN_DONE", "ms", timer.time(),
                           "target", target, "final", final, "error", error,
                           "stop_rate", rate, "brake_angle", heading,
                           "brake_travel", brake_travel, "brake_lead", stop_lead,
                           "settle_ms", config.SMOOTH_TURN_SETTLE_MS + settle_timer.time(),
                           "settle_rate", settle_rate)
                     if abs(error) > config.SMOOTH_TURN_ACCEPT_DEG:
-                        print("SMOOTH_TURN_ACCURACY_WARNING", error)
+                        config.protokolliere("SMOOTH_TURN_ACCURACY_WARNING", error)
                     self._telemetry_event("turn", 1, angle)
                     return True
 
@@ -857,7 +857,7 @@ class Robot:
                 self.drive_base.drive(0, direction * command_rate)
 
                 if config.SMOOTH_TURN_DEBUG and now >= next_log_ms:
-                    print("SMOOTH_TURN_STATUS", "ms", now, "heading", heading,
+                    config.protokolliere("SMOOTH_TURN_STATUS", "ms", now, "heading", heading,
                           "remaining", remaining, "rate", rate,
                           "command_rate", command_rate)
                     next_log_ms = now + config.TURN_LOG_INTERVAL_MS
@@ -896,7 +896,7 @@ class Robot:
         start_angle = self.drive_base.angle()
         target_angle = angle if absolute else start_angle + angle
 
-        print(
+        config.protokolliere(
             "TURN_REQUEST",
             "angle", angle,
             "start", start_angle,
@@ -946,7 +946,7 @@ class Robot:
                         else -config.TURN_COMPENSATION_DEG
                     )
                     correction = error + compensation
-                    print(
+                    config.protokolliere(
                         "TURN_CORRECTION_START",
                         "attempt", attempt + 1,
                         "target", target_angle,
@@ -963,7 +963,7 @@ class Robot:
                     )
                     self.wait(config.TURN_BRAKE_SETTLE_MS)
                     error = target_angle - self.drive_base.angle()
-                    print(
+                    config.protokolliere(
                         "TURN_CORRECTION_RESULT",
                         "attempt", attempt + 1,
                         "target", target_angle,
@@ -972,7 +972,7 @@ class Robot:
                     )
 
                 if abs(error) > config.TURN_COMPLETION_TOLERANCE_DEG:
-                    print(
+                    config.protokolliere(
                         "TURN_TARGET_TIMEOUT",
                         "target", target_angle,
                         "angle", self.drive_base.angle(),
@@ -980,7 +980,7 @@ class Robot:
                     )
                     raise MotionTimeout("turn target not reached")
 
-                print(
+                config.protokolliere(
                     "TURN_ACCURACY_OK",
                     "target", target_angle,
                     "angle", self.drive_base.angle(),
@@ -991,7 +991,7 @@ class Robot:
             self._telemetry_event("turn", 2, angle)
             raise
 
-        print(
+        config.protokolliere(
             "TURN_FINISH",
             "target", target_angle,
             "angle", self.drive_base.angle(),
@@ -1288,6 +1288,6 @@ class Robot:
         else:
             motor.stop()
 
-        print("MOTOR_STALLED", stall_reason, motor.angle())
+        config.protokolliere("MOTOR_STALLED", stall_reason, motor.angle())
         self._telemetry_event("motor_until_stalled", 1, speed, motor.angle())
         return motor.angle()
