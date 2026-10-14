@@ -20,7 +20,12 @@ def load(program, robot):
         robot.motor_angle(robot.right_motor, 300, -300)
         robot.straight(55)
         robot.motor_angle(robot.right_motor, 800, -360)
-        robot.straight(-850)
+        robot.motor_angle(robot.right_motor, 800, 300)
+        robot.straight(-250)
+        robot.turn(90)
+        robot.straight(310)
+        robot.turn(-90)
+        robot.straight(600, timeout_ms=50000)
     
     @program(3, "DerErsteRun?!")
     def route_program():
