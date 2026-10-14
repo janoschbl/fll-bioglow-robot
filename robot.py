@@ -487,7 +487,7 @@ class Robot:
 
             wait(config.MOTION_POLL_MS)
 
-    def straight(self, distance, then=Stop.HOLD, timeout_ms=None):
+    def straight(self, distance, then=Stop.HOLD, timeout_ms=None, precise=False):
         """Faehrt eine relative Strecke praezise und moeglichst gerade.
 
         Beide Fahrmotoren folgen per Positionsregelung demselben Weg-Zeit-Profil
@@ -498,9 +498,11 @@ class Robot:
         :param distance: Strecke in Millimetern; negative Werte fahren rueckwaerts.
         :param then: Motorverhalten nach Abschluss der Bewegung.
         :param timeout_ms: Maximale Dauer in Millisekunden oder None.
-        :return: True nach erfolgreichem Abschluss.
+        :param precise: Bei True ist das Zeitlimit deaktiviert; Gyro, Gleichlauf
+            und Endanflug bleiben aktiv. Bei False gilt timeout_ms.
+        :return: True nach erfolgreichem Abschluss, False wenn das Zeitlimit ablief.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
-        :raises MotionTimeout: Wenn das Zeitlimit ueberschritten wird.
+        :raises MotionTimeout: Nur bei Blockade (Rad hinkt zu weit hinterher).
         """
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
@@ -510,6 +512,8 @@ class Robot:
         self.stop_drive()
         q = STRAIGHT_PID
         timeout_ms = config.DRIVE_TIMEOUT_MS if timeout_ms is None else timeout_ms
+        use_timeout = not precise
+        timed_out = False
         left = self.left_drive_motor
         right = self.right_drive_motor
         mm_deg = 3.14159265 * config.WHEEL_DIAMETER_MM / 360
@@ -559,7 +563,7 @@ class Robot:
             kd = q["kdiff"]
             alpha = q["alpha"]
             config.protokolliere("STRAIGHT_START", "distance", distance, "speed", top,
-                  "heading", heading_goal, "timeout_ms", timeout_ms)
+                  "heading", heading_goal, "timeout_ms", timeout_ms, "precise", precise)
 
             while True:
                 self.check_abort()
@@ -599,9 +603,10 @@ class Robot:
                     raise MotionTimeout("straight blocked")
                 if tm >= t_end_ms:
                     break
-                if tm > timeout_ms:
+                if use_timeout and tm > timeout_ms:
                     self.brake_drive()
                     config.protokolliere("STRAIGHT_TIMEOUT", "ms", tm, "target", target)
+                    timed_out = True
                     raise MotionTimeout("straight timed out")
                 wait(q["loop_ms"])
 
@@ -636,16 +641,24 @@ class Robot:
             here = (left.angle() + right.angle()) * 0.5 * mm_deg
             config.protokolliere("STRAIGHT_DONE", "ms", timer.time(), "error_mm", here - target,
                   "heading_err", heading_goal - self.hub.imu.heading())
-        except (ProgramAborted, MotionTimeout):
+        except ProgramAborted:
             self.stop_drive()
             self._telemetry_event("straight", 2, distance)
             raise
+        except MotionTimeout:
+            self.stop_drive()
+            self._telemetry_event("straight", 2, distance)
+            if not timed_out:
+                raise
         finally:
             for motor, lim, tol in zip((left, right), saved_limits, saved_tol):
                 motor.control.limits(lim[0], lim[1], lim[2])
                 motor.control.target_tolerances(tol[0], tol[1])
 
         self._reset_drive_control()
+        if timed_out:
+            # Nur diese Fahrt abbrechen, das Programm laeuft weiter.
+            return False
         self._telemetry_event("straight", 1, distance)
         return True
 
@@ -884,10 +897,15 @@ class Robot:
         :param precise: Verwendet die kontinuierliche Ein-Pass-Drehung.
         :return: ``True`` nach erfolgreichem Abschluss.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
-        :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
+        :return False: Wenn Ziel oder Zeitlimit nicht erreicht wurden; das Programm laeuft weiter.
         """
         if precise:
-            return self._turn_one_pass(angle, absolute, timeout_ms)
+            try:
+                return self._turn_one_pass(angle, absolute, timeout_ms)
+            except MotionTimeout as error:
+                self.stop_drive()
+                config.protokolliere("TURN_TIMEOUT_SKIPPED", str(error))
+                return False
 
         self.check_abort()
         self._telemetry_event("turn", 0, angle)
@@ -986,10 +1004,15 @@ class Robot:
                     "angle", self.drive_base.angle(),
                     "error", error,
                 )
-        except (ProgramAborted, MotionTimeout):
+        except ProgramAborted:
             self.stop_drive()
             self._telemetry_event("turn", 2, angle)
             raise
+        except MotionTimeout as error:
+            self.stop_drive()
+            self._telemetry_event("turn", 2, angle)
+            config.protokolliere("TURN_TIMEOUT_SKIPPED", str(error))
+            return False
 
         config.protokolliere(
             "TURN_FINISH",
@@ -1008,7 +1031,7 @@ class Robot:
         :param precise: Verwendet die kontinuierliche Ein-Pass-Drehung.
         :return: ``True`` nach erfolgreichem Abschluss.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
-        :raises MotionTimeout: Wenn Ziel oder Zeitlimit nicht erreicht werden.
+        :return False: Wenn Ziel oder Zeitlimit nicht erreicht wurden; das Programm laeuft weiter.
         """
         return self.turn(
             heading,
