@@ -1,3 +1,9 @@
+# Telemetrie: robot.start_telemetry() beginnt die Aufnahme, robot.send_telemetry()
+# sendet sie. Beides darf in verschiedenen Programmen stehen -- etwa Start im
+# ersten und Senden am Ende des letzten, dann zeichnet ein Run die ganze Runde
+# auf. Bricht ein Programm ab, sendet das Menü die laufende Aufnahme sofort.
+
+
 def load(program, robot):
 
     @program(1, "setup")
@@ -8,8 +14,11 @@ def load(program, robot):
         
     @program(2, "betterGamble")
     def bettergamble():
+        robot.start_telemetry()
         robot.reset_drivebase_settings()
-        robot.set_drivebase_settings(800)
+
+        robot.set_drivebase_settings(600)
+        robot.set_drivebase_settings(straight_speed=800)
         robot.set_gyro_use(True)
         robot.straight(-10)
         robot.reset_heading(0)
@@ -18,14 +27,22 @@ def load(program, robot):
         robot.reset_heading(0)
         robot.straight(850)
         robot.motor_angle(robot.right_motor, 300, -300)
-        robot.straight(55)
+        robot.straight(60)
         robot.motor_angle(robot.right_motor, 800, -360)
         robot.motor_angle(robot.right_motor, 800, 300)
         robot.straight(-250)
         robot.turn(90)
         robot.straight(310)
         robot.turn(-90)
-        robot.straight(600, timeout_ms=50000)
+        robot.set_drivebase_settings(600)
+        robot.straight(86, precise=False)
+        robot.set_drivebase_settings(800)
+        robot.wait(300)
+        robot.straight(250, precise=False)      
+        robot.straight(-170)
+        robot.turn(-140)
+        robot.straight(550)
+        robot.send_telemetry()
     
     @program(3, "DerErsteRun?!")
     def route_program():

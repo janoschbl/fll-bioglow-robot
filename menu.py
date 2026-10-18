@@ -59,6 +59,7 @@ class Menu:
         if slots[index - 1] is not None:
             raise ValueError(label + " slot already used")
 
+        entry["number"] = index
         slots[index - 1] = entry
         return entry
 
@@ -228,7 +229,7 @@ class Menu:
         self.robot.reset_drivebase_settings()
 
         self.running_program = entry
-        self.robot.begin_program(entry["name"])
+        self.robot.begin_program(entry["name"], entry.get("number", 0))
         self.hub.display.off()
         outcome = "success"
 

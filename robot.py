@@ -74,6 +74,8 @@ class Robot:
         self.requested_stop = False
         self.previous_buttons = set()
         self.telemetry = None
+        self.program_name = "run"
+        self.program_number = 0
 
     def set_telemetry(self, telemetry):
         """Setzt den Empfänger für Lauf- und Bewegungsdaten.
@@ -82,25 +84,68 @@ class Robot:
         """
         self.telemetry = telemetry
 
-    def begin_program(self, name="run"):
+    def begin_program(self, name="run", number=0):
         """Beginnt einen Programmlauf und setzt den Abbruchzustand zurück.
 
-        :param name: Name des Programmlaufs für die Telemetrie.
+        Läuft schon eine Aufnahme aus einem früheren Programm, wird der
+        Programmwechsel darin markiert.
+
+        :param name: Name des Programms aus dem Menü.
+        :param number: Nummer des Programms im Menü.
         """
         self.requested_stop = False
         self.previous_buttons = set(self.hub.buttons.pressed())
-        if self.telemetry:
-            self.telemetry.begin(name)
+        self.program_name = name
+        self.program_number = number
+        self._telemetry_event("program", 0, number)
 
     def end_program(self, outcome="success"):
-        """Beendet den Programmlauf und sendet dessen Telemetrie.
+        """Beendet den Programmlauf.
+
+        Eine laufende Aufnahme bleibt nach einem erfolgreichen Programm offen,
+        damit sie über mehrere Programme reichen kann. Bricht ein Programm ab,
+        wird sie mit diesem Ergebnis gesendet.
 
         :param outcome: Ergebnisbezeichnung des Programmlaufs.
         """
-        if self.telemetry:
-            self.telemetry.finish_and_send(outcome)
+        if outcome == "success":
+            self._telemetry_event("program", 1, self.program_number)
+        elif self.telemetry_active():
+            self.send_telemetry(outcome)
         self.requested_stop = False
         self.previous_buttons = set(self.hub.buttons.pressed())
+
+    def start_telemetry(self, name=None, sample_ms=None):
+        """Startet die Aufnahme von Messpunkten und Befehlen.
+
+        Die Aufnahme läuft weiter, bis ``send_telemetry()`` sie sendet -- auch
+        über mehrere Programme hinweg. Ein erneuter Aufruf beginnt von vorn.
+
+        :param name: Name des Runs in der Code-Werkstatt; Standard ist der
+            Name des laufenden Programms.
+        :param sample_ms: Abstand der Messpunkte; Standard ist
+            ``TELEMETRY_SAMPLE_MS``.
+        """
+        if not self.telemetry:
+            return
+        self.telemetry.begin(name or self.program_name, sample_ms)
+        self._telemetry_event("program", 0, self.program_number)
+
+    def send_telemetry(self, outcome="success"):
+        """Beendet die Aufnahme und sendet sie an die Code-Werkstatt.
+
+        Ohne laufende Aufnahme passiert nichts. Das Senden dauert etwa eine
+        Sekunde je 3 KB; deshalb am besten erst am Ende des letzten Programms.
+
+        :param outcome: Ergebnis des Runs: success, aborted, timeout oder error.
+        """
+        if self.telemetry_active():
+            self._telemetry_event("program", 1, self.program_number)
+            self.telemetry.finish_and_send(outcome)
+
+    def telemetry_active(self):
+        """Gibt zurück, ob gerade aufgezeichnet wird."""
+        return bool(self.telemetry and self.telemetry.active)
 
     def _telemetry_tick(self):
         """Erfasst einen Telemetrie-Messpunkt, sofern Telemetrie aktiv ist."""
@@ -624,6 +669,7 @@ class Robot:
                 settle = StopWatch()
                 while settle.time() < 300:
                     self.check_abort()
+                    self._telemetry_tick()
                     if settle.time() > 60 and abs(left.speed()) < 15 and abs(right.speed()) < 15:
                         break
                     wait(q["loop_ms"])
