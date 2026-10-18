@@ -500,9 +500,9 @@ class Robot:
         :param timeout_ms: Maximale Dauer in Millisekunden oder None.
         :param precise: Bei True ist das Zeitlimit deaktiviert; Gyro, Gleichlauf
             und Endanflug bleiben aktiv. Bei False gilt timeout_ms.
-        :return: True nach erfolgreichem Abschluss, False wenn das Zeitlimit ablief.
+        :return: True nach erfolgreichem Abschluss, False bei Zeitlimit oder Blockade.
         :raises ProgramAborted: Wenn der Benutzer den Lauf abbricht.
-        :raises MotionTimeout: Nur bei Blockade (Rad hinkt zu weit hinterher).
+        :raises MotionTimeout: Wird nicht mehr geworfen; die Fahrt endet nur selbst.
         """
         self.check_abort()
         self._telemetry_event("straight", 0, distance)
@@ -600,6 +600,7 @@ class Robot:
                 if max(abs(err_l), abs(err_r)) > q["max_lag"]:
                     self.brake_drive()
                     config.protokolliere("STRAIGHT_BLOCKED", "ms", tm, "err_l", err_l, "err_r", err_r)
+                    timed_out = True  # Blockade beendet nur diese Fahrt, nicht das Programm
                     raise MotionTimeout("straight blocked")
                 if tm >= t_end_ms:
                     break
@@ -1093,10 +1094,15 @@ class Robot:
                     else config.MOTION_MIN_PROGRESS_MM
                 ),
             )
-        except (ProgramAborted, MotionTimeout):
+        except ProgramAborted:
             self.stop_drive()
             self._telemetry_event("arc", 2, radius)
             raise
+        except MotionTimeout as error:
+            self.stop_drive()
+            self._telemetry_event("arc", 2, radius)
+            config.protokolliere("ARC_TIMEOUT_SKIPPED", str(error))
+            return False
 
         self._telemetry_event("arc", 1, radius)
         return True
@@ -1231,9 +1237,13 @@ class Robot:
                     else config.MOTION_MIN_PROGRESS_DEG
                 ),
             )
-        except (ProgramAborted, MotionTimeout):
+        except ProgramAborted:
             self.stop_attachment(motor)
             raise
+        except MotionTimeout as error:
+            self.stop_attachment(motor)
+            config.protokolliere("MOTOR_TIMEOUT_SKIPPED", action_name, str(error))
+            return False
 
         return True
 
