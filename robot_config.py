@@ -70,12 +70,18 @@ STALL_PROGRESS_WINDOW_MS = 400
 STALL_MIN_PROGRESS_DEG = 3
 STALL_MIN_PROGRESS_RATIO = 0.10
 
-# False: keine Telemetrie und keine Konsolenausgaben; direkt zum nächsten Programm.
-TELEMETRY_ENABLED = True
+# False: keine Konsolenausgaben. Telemetrie ist kein Schalter mehr, sondern
+# wird im Programm mit robot.start_telemetry() / robot.send_telemetry() gesteuert.
+CONSOLE_OUTPUT = True
+
 TELEMETRY_SAMPLE_MS = 20
-TELEMETRY_MAX_BYTES = 180000
+# Fester Speicher, einmal beim ersten start_telemetry() reserviert. Ist er voll,
+# wird jeder zweite Messpunkt verworfen und der Abstand verdoppelt -- lange
+# Aufnahmen über mehrere Programme werden gröber, brechen aber nicht ab.
+# Senden kostet etwa 1 Sekunde je 3 KB.
+TELEMETRY_BUFFER_BYTES = 80000
 
 
 def protokolliere(*werte, **optionen):
-    if TELEMETRY_ENABLED:
+    if CONSOLE_OUTPUT:
         print(*werte, **optionen)
