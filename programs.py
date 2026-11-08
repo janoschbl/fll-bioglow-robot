@@ -1,9 +1,3 @@
-# Telemetrie: robot.start_telemetry() beginnt die Aufnahme, robot.send_telemetry()
-# sendet sie. Beides darf in verschiedenen Programmen stehen -- etwa Start im
-# ersten und Senden am Ende des letzten, dann zeichnet ein Run die ganze Runde
-# auf. Bricht ein Programm ab, sendet das Menü die laufende Aufnahme sofort.
-
-
 def load(program, robot):
 
     @program(1, "setup")
@@ -11,10 +5,9 @@ def load(program, robot):
         robot.motor_target(robot.right_motor, 300, 45)
         robot.motor_target(robot.left_motor, 300, 0)
         robot.wait(2000)
-        
+
     @program(2, "betterGamble")
     def bettergamble():
-        robot.start_telemetry()
         robot.reset_drivebase_settings()
 
         robot.set_drivebase_settings(600)
@@ -23,7 +16,7 @@ def load(program, robot):
         robot.straight(-10)
         robot.reset_heading(0)
         robot.set_gyro_use(True)
-        
+
         robot.reset_heading(0)
         robot.straight(850)
         robot.motor_angle(robot.right_motor, 300, -300)
@@ -35,15 +28,14 @@ def load(program, robot):
         robot.straight(310)
         robot.turn(-90)
         robot.set_drivebase_settings(600)
-        robot.straight(86, precise=False)
+        robot.straight(90, precise=False)
         robot.set_drivebase_settings(800)
         robot.wait(300)
-        robot.straight(250, precise=False)      
+        robot.straight(250, precise=False)
         robot.straight(-170)
         robot.turn(-140)
         robot.straight(550)
-        robot.send_telemetry()
-    
+
     @program(3, "DerErsteRun?!")
     def route_program():
         robot.set_gyro_use(True)
@@ -57,7 +49,7 @@ def load(program, robot):
         robot.motor_angle(robot.right_motor, speed=300, angle=130)
         robot.set_drivebase_settings(straight_speed=800)
         robot.straight(-500)
-    
+
     @program(4, "Drohnenfiech")
     def drohnenfiech():
         robot.set_gyro_use(True)
@@ -92,7 +84,7 @@ def load(program, robot):
         robot.straight(140)
         robot.straight(-65)
         robot.turn(-100)
-        
+
     @program(5, "weisses Ding")
     def route_program():
         robot.motor_target(robot.right_motor, 500, -10)
@@ -118,19 +110,49 @@ def load(program, robot):
         robot.turn(70)
         robot.straight(680)
 
+    @program(6, "tjostenFragezeichen")
+    def ziehDing():
+        robot.set_drivebase_settings(1000)
+        robot.straight(400)
+        robot.multitask(robot.motor_angle_task(robot.right_motor, 300, -30), robot.motor_angle_task(robot.left_motor, 300, 30))
+        # hier den Samen einsammeln !!!!
+        robot.straight(-100)
+        robot.multitask(robot.straight_task(-300), robot.motor_angle_task(robot.right_motor, 100, 30), robot.motor_angle_task(robot.left_motor, 100, -30))
+        robot.wait(500)
+        robot.straight(-300)
 
-    @program(6, "altePalme")
+
+    @program(7, "raushebeding")
+    def raushebeding():
+        robot.set_drivebase_settings(1000)
+        robot.straight(450)
+        robot.set_drivebase_settings(40)
+        robot.straight(-50)
+        robot.multitask(robot.motor_angle_task(robot.right_motor,-300, 120), robot.motor_angle_task(robot.left_motor,-300, -120))
+        robot.reset_drivebase_settings()
+        robot.straight(-400)
+        robot.multitask(robot.motor_angle_task(robot.right_motor,-300, -120), robot.motor_angle_task(robot.left_motor,-300, 120))
+
+    @program(8, "altePalme")
     def altePalme():
-        robot.motor_target(robot.right_motor, 600, -60)
+        robot.motor_target(robot.right_motor, 600, 0)
+        robot.motor_target(robot.left_motor, 600, 0)
         robot.wait(3000)
         robot.set_gyro_use(True)
-        robot.straight(-10)
         robot.reset_heading(0)
+        robot.reset_drivebase_settings()
         robot.set_drivebase_settings(800)
-        robot.straight(300)
-        robot.motor_angle(robot.right_motor, 300, 40)
-        robot.straight(80)
-        robot.motor_angle(robot.right_motor, 200, -55)
-        robot.straight(-120)
-        robot.motor_angle(robot.right_motor, 300, 55)
+        robot.straight(450)
+        robot.turn(-45)
+        robot.straight(205)
+        robot.turn(90)
+        robot.straight(250)
+        robot.motor_angle(robot.left_motor, 600, 90)
+        robot.straight(-20)
+        robot.motor_angle(robot.left_motor, 600, -90)
+        robot.straight(50)
+        robot.motor_angle(robot.right_motor, 600, 160)
+        robot.motor_angle(robot.right_motor, 600, -160)
         robot.straight(-200)
+        robot.turn(-60)
+        robot.straight(-700)
