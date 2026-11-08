@@ -52,14 +52,14 @@ def main():
     robot.reset_drivebase_settings()
 
     force_sensor = create_force_sensor()
-    if config.TELEMETRY_ENABLED:
-        telemetry = Telemetry(
-            hub,
-            drive_base,
-            (left_motor, right_motor, left_drive_motor, right_drive_motor),
-            force_sensor,
-        )
-        robot.set_telemetry(telemetry)
+    # Aufgezeichnet wird erst nach robot.start_telemetry() im Programm.
+    telemetry = Telemetry(
+        hub,
+        drive_base,
+        (left_motor, right_motor, left_drive_motor, right_drive_motor),
+        force_sensor,
+    )
+    robot.set_telemetry(telemetry)
     menu = Menu(hub, robot, force_sensor)
     programs.load(menu.program, robot)
 

@@ -4,4 +4,3 @@ __pycache__/
 .vscode/
 benchmarking/
 benchmark_log.txt
-/programs.py

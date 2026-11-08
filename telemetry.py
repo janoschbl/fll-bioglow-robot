@@ -36,7 +36,13 @@ EVENT_IDS = {
     "settings": 9,
     "gyro": 10,
     "drive": 11,
+    "reset_heading": 12,
+    # Programmwechsel innerhalb einer Aufnahme; wert1 = Programmnummer im Menü.
+    "program": 13,
 }
+
+SAMPLE_SIZE = struct.calcsize(SAMPLE_FORMAT)
+EVENT_SIZE = struct.calcsize(EVENT_FORMAT)
 
 OUTCOMES = {
     "success": 0,
@@ -64,6 +70,13 @@ def _crc16(data):
 
 
 class Telemetry:
+    """Zeichnet Messpunkte und Befehle auf und sendet sie gesammelt.
+
+    Aufnahme und Senden steuert das Programm selbst über
+    ``robot.start_telemetry()`` und ``robot.send_telemetry()``. Ohne Aufnahme
+    kostet die Telemetrie keine Rechenzeit.
+    """
+
     def __init__(self, hub, drive_base, motors, force_sensor=None):
         self.hub = hub
         self.drive_base = drive_base
@@ -71,69 +84,106 @@ class Telemetry:
         self.force_sensor = force_sensor
         self.clock = StopWatch()
         self.app_data = None
-        if config.TELEMETRY_ENABLED and AppData is not None:
-            try:
-                self.app_data = AppData([])
-            except Exception as error:
-                config.protokolliere("TELEMETRY_APPDATA_UNAVAILABLE", str(error))
+        self.buffer = None
+        self.length = 0
 
         self.active = False
-        self.data = bytearray()
         self.run_id = 0
         self.run_name = ""
+        self.sample_ms = config.TELEMETRY_SAMPLE_MS
         self.started_ms = 0
         self.next_sample_ms = 0
         self.samples = 0
         self.dropped = 0
         self.events = 0
-        self.buffer_full = False
 
-    def begin(self, name):
-        if not config.TELEMETRY_ENABLED:
+    def _reserve(self):
+        # Ein einziger fester Block statt wachsendem bytearray: Beim Vergrößern
+        # braucht MicroPython alten und neuen Block gleichzeitig, und ab etwa
+        # 60 KB gingen dadurch Messpunkte und Befehle verloren.
+        if self.buffer is not None:
+            return True
+        size = config.TELEMETRY_BUFFER_BYTES
+        while size >= 8000:
+            try:
+                self.buffer = bytearray(size)
+                return True
+            except MemoryError:
+                size //= 2
+        config.protokolliere("TELEMETRY_NO_MEMORY")
+        return False
+
+    def begin(self, name, sample_ms=None):
+        """Beginnt eine neue Aufnahme; eine laufende wird verworfen."""
+        if not self._reserve():
             return
         self.run_id = (self.run_id + 1) & 0x3FFFFFFF
         self.run_name = str(name)[:80]
+        self.sample_ms = max(10, int(sample_ms or config.TELEMETRY_SAMPLE_MS))
         self.started_ms = self.clock.time()
         self.next_sample_ms = self.started_ms
-        self.data = bytearray()
+        self.length = 0
         self.samples = 0
         self.dropped = 0
         self.events = 0
-        self.buffer_full = False
         self.active = True
         self.tick(force=True)
 
     def _metadata(self):
         return struct.pack(
             "<HHHHH",
-            config.TELEMETRY_SAMPLE_MS,
+            self.sample_ms,
             int(round(config.WHEEL_DIAMETER_MM * 10)),
             int(round(config.AXLE_TRACK_MM * 10)),
-            struct.calcsize(SAMPLE_FORMAT),
-            struct.calcsize(EVENT_FORMAT),
+            SAMPLE_SIZE,
+            EVENT_SIZE,
         ) + bytes(self.run_name, "utf-8")
 
-    def _append(self, record):
-        if self.buffer_full or len(self.data) + len(record) > config.TELEMETRY_MAX_BYTES:
-            self.buffer_full = True
-            self.dropped += 1
-            return False
-        try:
-            self.data.extend(record)
-        except MemoryError:
-            self.buffer_full = True
-            self.dropped += 1
-            return False
-        return True
+    def _thin_out(self):
+        """Verwirft jeden zweiten Messpunkt und verdoppelt den Abstand.
+
+        Befehle bleiben vollständig erhalten. Kopiert wird über
+        unpack_from/pack_into, das jede MicroPython-Fassung kann.
+        """
+        read = write = 0
+        keep = True
+        while read < self.length:
+            is_sample = self.buffer[read] == 1
+            form = SAMPLE_FORMAT if is_sample else EVENT_FORMAT
+            size = SAMPLE_SIZE if is_sample else EVENT_SIZE
+            if not is_sample or keep:
+                if write != read:
+                    struct.pack_into(form, self.buffer, write, *struct.unpack_from(form, self.buffer, read))
+                write += size
+            else:
+                self.samples -= 1
+                self.dropped += 1
+            if is_sample:
+                keep = not keep
+            read += size
+        self.length = write
+        self.sample_ms *= 2
+
+    def _room(self, size):
+        if self.length + size <= len(self.buffer):
+            return True
+        if self.samples > 1:
+            self._thin_out()
+        if self.length + size <= len(self.buffer):
+            return True
+        self.dropped += 1
+        return False
 
     def tick(self, force=False):
-        if not config.TELEMETRY_ENABLED or not self.active:
+        if not self.active:
             return
         now = self.clock.time()
         if not force and now < self.next_sample_ms:
             return
         while self.next_sample_ms <= now:
-            self.next_sample_ms += config.TELEMETRY_SAMPLE_MS
+            self.next_sample_ms += self.sample_ms
+        if not self._room(SAMPLE_SIZE):
+            return
 
         try:
             acceleration = self.hub.imu.acceleration()
@@ -169,8 +219,10 @@ class Telemetry:
             if self.hub.imu.stationary():
                 flags |= 1 << 10
 
-            record = struct.pack(
+            struct.pack_into(
                 SAMPLE_FORMAT,
+                self.buffer,
+                self.length,
                 1,
                 now - self.started_ms,
                 *[_clamp(value / 4, -32768, 32767) for value in acceleration],
@@ -187,58 +239,66 @@ class Telemetry:
                 force,
                 flags,
             )
-            if self._append(record):
-                self.samples += 1
+            self.length += SAMPLE_SIZE
+            self.samples += 1
         except Exception as error:
             self.dropped += 1
             if self.dropped == 1:
                 config.protokolliere("TELEMETRY_SAMPLE_ERROR", str(error))
 
     def event(self, name, phase, value1=0, value2=0):
-        if not config.TELEMETRY_ENABLED or not self.active:
+        if not self.active or not self._room(EVENT_SIZE):
             return
-        identifier = EVENT_IDS.get(name, 0)
-        record = struct.pack(
+        struct.pack_into(
             EVENT_FORMAT,
+            self.buffer,
+            self.length,
             2,
             self.clock.time() - self.started_ms,
-            identifier,
+            EVENT_IDS.get(name, 0),
             phase,
             _clamp(value1, -1073741823, 1073741823),
             _clamp(value2, -1073741823, 1073741823),
         )
-        if self._append(record):
-            self.events += 1
+        self.length += EVENT_SIZE
+        self.events += 1
 
     def _packet(self, kind, sequence, payload):
         header = struct.pack("<4sBIHH", MAGIC, kind, self.run_id, sequence, len(payload))
         return header + struct.pack("<H", _crc16(header + payload)) + payload
 
     def _send(self, packet):
-        if not config.TELEMETRY_ENABLED:
-            return
+        if self.app_data is None and AppData is not None:
+            try:
+                self.app_data = AppData([])
+            except Exception as error:
+                config.protokolliere("TELEMETRY_APPDATA_UNAVAILABLE", str(error))
         if self.app_data is not None:
             self.app_data.write_bytes(packet)
             return
         if ubinascii is None:
             raise RuntimeError("Kein AppData- oder Base64-Transport verfügbar")
-        config.protokolliere("@BGB1", ubinascii.b2a_base64(packet).decode().strip())
+        # Rückfall ohne AppData geht über die Konsole und ist deshalb nicht abschaltbar.
+        print("@BGB1", ubinascii.b2a_base64(packet).decode().strip())
 
     def finish_and_send(self, outcome):
-        if not config.TELEMETRY_ENABLED or not self.active:
+        """Beendet die Aufnahme und überträgt sie an die Code-Werkstatt."""
+        if not self.active:
             return
         self.tick(force=True)
         self.active = False
+        # Die Laufzeit endet hier; die Übertragung danach zählt nicht mit.
+        duration_ms = self.clock.time() - self.started_ms
         sequence = 0
         self._send(self._packet(0, sequence, self._metadata()))
         sequence += 1
-        for offset in range(0, len(self.data), PACKET_PAYLOAD):
-            self._send(self._packet(1, sequence, self.data[offset:offset + PACKET_PAYLOAD]))
+        for offset in range(0, self.length, PACKET_PAYLOAD):
+            self._send(self._packet(1, sequence, bytes(self.buffer[offset:min(offset + PACKET_PAYLOAD, self.length)])))
             sequence += 1
         end = struct.pack(
             END_FORMAT,
             3,
-            self.clock.time() - self.started_ms,
+            duration_ms,
             self.samples,
             self.events,
             self.dropped,
