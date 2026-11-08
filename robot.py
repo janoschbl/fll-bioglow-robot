@@ -1213,14 +1213,34 @@ class Robot:
         """
         self.check_abort()
         self._telemetry_event("motor_target", 0, speed, target)
-        start_angle = motor.angle()
+        if timeout_ms is None:
+            timeout_ms = config.MOTOR_TARGET_TIMEOUT_MS
+
         motor.run_target(speed, target, then=then, wait=False)
-        result = self._wait_for_motor(
-            motor,
-            "motor_target",
-            timeout_ms,
-            start_angle,
-        )
+        timer = StopWatch()
+        result = True
+
+        try:
+            # Nicht auf motor.done() warten: Der Regler feilt noch Sekunden an
+            # den letzten Graden. Nah genug am Ziel reicht.
+            while abs(motor.angle() - target) > config.MOTOR_TARGET_TOLERANCE_DEG:
+                self.check_abort()
+                self._telemetry_tick()
+                if timer.time() >= timeout_ms:
+                    config.protokolliere("MOTOR_TIMEOUT_SKIPPED", "motor_target")
+                    result = False
+                    break
+                wait(config.MOTION_POLL_MS)
+        except ProgramAborted:
+            self.stop_attachment(motor)
+            raise
+
+        if then == Stop.HOLD:
+            motor.hold()
+        elif then == Stop.BRAKE:
+            motor.brake()
+        else:
+            motor.stop()
         self._telemetry_event("motor_target", 1, speed, target)
         return result
 
